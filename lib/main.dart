@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:vibration/vibration.dart';
 
 // ==========================================
 // 🎨 ЦВЕТА
@@ -34,8 +36,12 @@ class DiaryEntry {
   String text;
   String emoji;
   DateTime date;
-  DiaryEntry({this.type = "Идея", this.text = "", this.emoji = "💡", DateTime? date})
-      : date = date ?? DateTime.now();
+  DiaryEntry({
+    this.type = "Идея",
+    this.text = "",
+    this.emoji = "💡",
+    DateTime? date,
+  }) : date = date ?? DateTime.now();
 }
 
 class MoodEntry {
@@ -68,34 +74,61 @@ class AppState {
     userName = "";
     avatar = "🌸";
     age = "";
+    apiKey = "";
     entries.clear();
     moods.clear();
   }
 }
 
 // ==========================================
-// 🤖 ИИ-СЕРВИС (Groq)
+// 💡 СОВЕТЫ ДНЯ
+// ==========================================
+final List<String> dailyTips = [
+  "Ты справляешься лучше, чем тебе кажется. 💜",
+  "Твои чувства — настоящие. Ты имеешь право их испытывать. 🌸",
+  "Один шаг — уже движение. Не требуй от себя всего сразу. ✨",
+  "Ты не обязан(а) быть сильным(ой) всё время. Отдых — это тоже забота. 🌿",
+  "Каждый день — новая возможность начать заново. 🌅",
+  "Твоё «нет» — это забота о себе. 🛡",
+  "Дыши. Всё, что ты сейчас чувствуешь, — пройдёт. 🌊",
+  "Ты важен(на) — просто потому что ты есть. 💫",
+  "Не сравнивай свой путь с чужим. У каждого — своя скорость. 🐢",
+  "Даже маленькая победа — это победа. Отмечай их. 🎉",
+  "Позволь себе быть неидеальным(ой). Идеальных нет. 🌷",
+  "Усталость — не слабость. Это сигнал, что пора отдохнуть. 😴",
+  "Ты уже пережил(а) 100% своих худших дней. 💪",
+  "Твои границы — это не эгоизм. Это уважение к себе. 🚪",
+  "Просить помощи — это смелость, а не слабость. 🤝",
+  "Замечай хорошее. Даже если это просто чашка чая. ☕",
+  "Ты не одна(один). Даже если сейчас так кажется. 🌍",
+  "Плохие дни не означают плохую жизнь. 🌦",
+  "Твоя ценность не зависит от продуктивности. 💎",
+  "Сегодня можно сделать меньше. И этого достаточно. 🤍",
+];
+
+// ==========================================
+// 🤖 ИИ-СЕРВИС
 // ==========================================
 class AiService {
   final String apiKey;
+  final String systemPrompt;
   static const String baseUrl = 'https://api.groq.com/openai/v1';
-  static const String model = 'llama-3.3-70b-versatile';
+static const String model = 'openai/gpt-oss-120b';
 
-  AiService(this.apiKey);
+  AiService({required this.apiKey, String? prompt})
+      : systemPrompt = prompt ?? defaultPrompt;
 
-  static const String systemPrompt = '''
+  static const String defaultPrompt = '''
 Ты — «Карманный психолог», тёплый собеседник для подростков из Беларуси.
 
 ПРАВИЛА:
 1. Говори по-русски, простым языком, как друг-сверстник. Но с заботой.
-2. НИКОГДА не осуждай. Не говори «ты должен», «это глупо», «сама виновата».
-3. Сначала ОТРАЖАЙ чувства: «Похоже, тебе сейчас очень тяжело...»
-4. Потом задавай ОДИН открытый вопрос.
-5. Не давай медицинских советов, не ставь диагнозы.
-6. Если слышишь про суицид, самоповреждение или насилие — мягко предложи позвонить 8 801 100 16 11 (круглосуточно, анонимно, Беларусь).
-7. Отвечай коротко: 2–4 предложения. Не читай лекции.
-8. Используй 1–2 эмодзи на сообщение.
-9. Не используй списки и заголовки — только живой разговор.
+2. НИКОГДА не осуждай.
+3. Сначала ОТРАЖАЙ чувства, потом задавай ОДИН открытый вопрос.
+4. Не давай медицинских советов, не ставь диагнозы.
+5. При суициде/самоповреждении — мягко предложи позвонить 8 801 100 16 11.
+6. Отвечай коротко: 2–4 предложения.
+7. Используй 1–2 эмодзи.
 ''';
 
   Future<String> chat(List<ChatMessage> history) async {
@@ -105,39 +138,36 @@ class AiService {
     ];
 
     try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/chat/completions'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: jsonEncode({
-          'model': model,
-          'messages': messages,
-          'temperature': 0.75,
-          'max_tokens': 400,
-        }),
-      ).timeout(const Duration(seconds: 30));
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/chat/completions'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $apiKey',
+            },
+            body: jsonEncode({
+              'model': model,
+              'messages': messages,
+              'temperature': 0.75,
+              'max_tokens': 400,
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 401) {
-        return 'Неверный API-ключ. Проверь его в Groq.';
+        return '⚠ Неверный API-ключ. Проверь его в Groq.';
       }
       if (response.statusCode == 429) {
-        return 'Слишком много запросов. Подожди минуту.';
+        return '⚠ Слишком много запросов. Подожди минуту.';
       }
       if (response.statusCode != 200) {
-        return 'Ошибка API: ${response.statusCode}. Попробуй ещё раз.';
+        return '⚠ Ошибка API: ${response.statusCode}. Попробуй ещё раз.';
       }
 
       final data = jsonDecode(utf8.decode(response.bodyBytes));
       return data['choices'][0]['message']['content'] as String;
     } catch (e) {
-      if (e.toString().contains('CORS') ||
-          e.toString().contains('XMLHttpRequest') ||
-          e.toString().contains('Failed to fetch')) {
-        return 'Из браузера Chrome запрос блокируется (CORS).\n\nЗапусти приложение как Windows-приложение:\nflutter run -d windows — там ИИ работает.';
-      }
-      return 'Не получилось: $e\n\nПроверь интернет и ключ.';
+      return '⚠ Не получилось связаться с ИИ.\n\nПроверь:\n1. Ключ Groq введён (начинается с gsk_)\n2. Есть интернет';
     }
   }
 }
@@ -170,12 +200,38 @@ final List<CrisisProtocol> crisisProtocols = [
     subtitle: "Когда кажется, что выхода нет",
     color: const Color(0xFF8E7CC3),
     steps: [
-      {"t": "1. Останови мгновение", "d": "Мысли о смерти — это не желание умереть. Это желание, чтобы боль закончилась.", "a": "Скажи вслух: «Я хочу не умереть. Я хочу, чтобы перестало болеть.»"},
-      {"t": "2. Ты в безопасности?", "d": "Если ты уже причинил(а) себе вред — вызови 103. Это не слабость, это забота.", "a": "Отложи всё опасное в другую комнату."},
-      {"t": "3. Правило 5 минут", "d": "Пик импульса длится 5–20 минут. Продержись — станет легче.", "a": "Поставь таймер. Дыши: 4 вдох → 7 задержка → 8 выдох."},
-      {"t": "4. Заземлись", "d": "Тело возвращает в «сейчас».", "a": "5 вещей видишь → 4 звука → 3 касаешься → 2 запаха → 1 вкус."},
-      {"t": "5. Обратись к кому-то", "d": "Одиночество усиливает боль.", "a": "Напиши: «Мне плохо, побудь со мной.»"},
-      {"t": "6. Отложи решение", "d": "Решение в пике боли — не твоё настоящее решение.", "a": "«Я вернусь к этому через 24 часа. Не раньше.»"},
+      {
+        "t": "1. Останови мгновение",
+        "d":
+            "Мысли о смерти — это не желание умереть. Это желание, чтобы боль закончилась.",
+        "a":
+            "Скажи вслух: «Я хочу не умереть. Я хочу, чтобы перестало болеть.»"
+      },
+      {
+        "t": "2. Ты в безопасности?",
+        "d": "Если ты уже причинил(а) себе вред — вызови 103.",
+        "a": "Отложи всё опасное в другую комнату."
+      },
+      {
+        "t": "3. Правило 5 минут",
+        "d": "Пик импульса длится 5–20 минут.",
+        "a": "Поставь таймер. Дыши: 4 вдох → 7 задержка → 8 выдох."
+      },
+      {
+        "t": "4. Заземлись",
+        "d": "Тело возвращает в «сейчас».",
+        "a": "5 видишь → 4 слышишь → 3 касаешься → 2 запаха → 1 вкус."
+      },
+      {
+        "t": "5. Обратись к кому-то",
+        "d": "Одиночество усиливает боль.",
+        "a": "Напиши: «Мне плохо, побудь со мной.»"
+      },
+      {
+        "t": "6. Отложи решение",
+        "d": "Решение в пике боли — не настоящее.",
+        "a": "«Я вернусь к этому через 24 часа.»"
+      },
     ],
     closing: "Ты важен(на). Твоя боль реальна, но она не навсегда. 💜",
   ),
@@ -185,26 +241,65 @@ final List<CrisisProtocol> crisisProtocols = [
     subtitle: "Сердце колотится, не хватает воздуха",
     color: const Color(0xFFFFB6C1),
     steps: [
-      {"t": "1. Ты не умираешь", "d": "Паника неприятна, но НЕ опасна. Пройдёт через 5–20 минут."},
-      {"t": "2. Найди опору", "d": "Сядь. Почувствуй спиной стул, стопами — пол.", "a": "Надави стопами в пол 5 секунд. Отпусти. Повтори 3 раза."},
-      {"t": "3. Дыхание 4-7-8", "d": "Замедляет пульс.", "a": "Вдох 4 → задержка 7 → выдох 8. 4 раза."},
-      {"t": "4. Холод", "d": "Активирует «нырятельный рефлекс» — пульс падает.", "a": "Умойся ледяной водой или лёд к запястьям на 30 секунд."},
+      {
+        "t": "1. Ты не умираешь",
+        "d": "Паника неприятна, но НЕ опасна. Пройдёт через 5–20 минут."
+      },
+      {
+        "t": "2. Найди опору",
+        "d": "Сядь. Почувствуй спиной стул.",
+        "a": "Надави стопами в пол 5 секунд. Повтори 3 раза."
+      },
+      {
+        "t": "3. Дыхание 4-7-8",
+        "d": "Замедляет пульс.",
+        "a": "Вдох 4 → задержка 7 → выдох 8. 4 раза."
+      },
+      {
+        "t": "4. Холод",
+        "d": "Активирует «нырятельный рефлекс».",
+        "a": "Умойся ледяной водой."
+      },
       {"t": "5. Отвлеки мозг", "d": "Назови вслух 5 предметов вокруг."},
-      {"t": "6. Мантра", "d": "Повторяй:", "a": "«Это паника. Она не убьёт. Она проходит. Я в безопасности.»"},
+      {
+        "t": "6. Мантра",
+        "d": "Повторяй:",
+        "a": "«Это паника. Она не убьёт. Я в безопасности.»"
+      },
     ],
-    closing: "Ты справился(ась). Сердце — не враг. Оно просто испугалось. 🌸",
+    closing: "Ты справился(ась). Сердце — не враг. 🌸",
   ),
   CrisisProtocol(
     emoji: "🌙",
     title: "Бессонница",
-    subtitle: "Не могу уснуть, мысли крутятся",
+    subtitle: "Не могу уснуть",
     color: const Color(0xFFC4E4FF),
     steps: [
-      {"t": "1. Правило 20 минут", "d": "Не уснул(а) за 20 минут — встань.", "a": "Перейди в другое место. Тусклый свет."},
-      {"t": "2. Дыхание 4-7-8", "d": "Включает режим «отдых».", "a": "3 цикла."},
-      {"t": "3. Выгрузи мысли", "d": "Мозг держит то, что не записано.", "a": "5 минут пиши ВСЁ."},
-      {"t": "4. Прогрессивная релаксация", "d": "Напряги-расслабь мышцы.", "a": "Стопы → голени → бёдра → живот → руки → плечи → лицо."},
-      {"t": "5. Не смотри на часы", "d": "Проверка времени = тревога.", "a": "Разверни телефон."},
+      {
+        "t": "1. Правило 20 минут",
+        "d": "Не уснул(а) — встань.",
+        "a": "Перейди в другое место."
+      },
+      {
+        "t": "2. Дыхание 4-7-8",
+        "d": "Включает режим «отдых».",
+        "a": "3 цикла."
+      },
+      {
+        "t": "3. Выгрузи мысли",
+        "d": "Мозг держит то, что не записано.",
+        "a": "5 минут пиши ВСЁ."
+      },
+      {
+        "t": "4. Прогрессивная релаксация",
+        "d": "Напряги-расслабь мышцы.",
+        "a": "Стопы → голени → бёдра → живот → руки → плечи → лицо."
+      },
+      {
+        "t": "5. Не смотри на часы",
+        "d": "Проверка времени = тревога.",
+        "a": "Разверни телефон."
+      },
     ],
     closing: "Одна ночь не разрушит тебя. 🌙",
   ),
@@ -214,59 +309,95 @@ final List<CrisisProtocol> crisisProtocols = [
     subtitle: "Внутри всё сжимается",
     color: const Color(0xFFFFDAB9),
     steps: [
-      {"t": "1. Назови тревогу", "d": "Неопределённая тревога сильнее.", "a": "«Я тревожусь о ___.»"},
-      {"t": "2. Факт vs страх", "d": "Тревога путает реальность с прогнозом.", "a": "«Что сейчас, а что я предсказываю?»"},
+      {
+        "t": "1. Назови тревогу",
+        "d": "Неопределённая тревога сильнее.",
+        "a": "«Я тревожусь о ___.»"
+      },
+      {"t": "2. Факт vs страх", "d": "Тревога путает реальность с прогнозом."},
       {"t": "3. Шкала 0-10", "d": "Оцени тревогу."},
-      {"t": "4. Удлинённый выдох", "d": "Выдох длиннее вдоха = безопасность.", "a": "Вдох 4 → выдох 8. 5 минут."},
-      {"t": "5. Движение", "d": "Тревога — это энергия.", "a": "20 приседаний или прогулка 5 минут."},
-      {"t": "6. Маленькое действие", "d": "Тревога живёт в бездействии.", "a": "Сделай что-то на 2 минуты."},
+      {
+        "t": "4. Удлинённый выдох",
+        "d": "Выдох длиннее вдоха = безопасность.",
+        "a": "Вдох 4 → выдох 8. 5 минут."
+      },
+      {
+        "t": "5. Движение",
+        "d": "Тревога — это энергия.",
+        "a": "20 приседаний."
+      },
+      {
+        "t": "6. Маленькое действие",
+        "d": "Тревога живёт в бездействии.",
+        "a": "Сделай что-то на 2 минуты."
+      },
     ],
     closing: "Тревога — не приговор. 💜",
   ),
   CrisisProtocol(
     emoji: "🔥",
     title: "Гнев / агрессия",
-    subtitle: "Хочется кричать, крушить",
+    subtitle: "Хочется кричать",
     color: const Color(0xFFFFB6B6),
     steps: [
-      {"t": "1. Выйди из ситуации", "d": "Гнев длится 90 секунд.", "a": "«Мне нужно 5 минут.»"},
-      {"t": "2. Сбрось энергию", "d": "Через мышцы.", "a": "20 приседаний, отжимания, бей подушку."},
-      {"t": "3. Дыхание", "d": "Вдох 4 → задержка 4 → выдох 6.", "a": "6 циклов."},
+      {
+        "t": "1. Выйди из ситуации",
+        "d": "Гнев длится 90 секунд.",
+        "a": "«Мне нужно 5 минут.»"
+      },
+      {"t": "2. Сбрось энергию", "d": "Через мышцы.", "a": "20 приседаний."},
+      {"t": "3. Дыхание", "d": "Вдох 4 → задержка 4 → выдох 6."},
       {"t": "4. Отдели гнев от действия", "d": "Чувство — ок. Крик/удар — нет."},
-      {"t": "5. Что за гневом?", "d": "Под гневом: боль, страх, стыд.", "a": "«Я злюсь, потому что мне важно, чтобы ___.»"},
-      {"t": "6. Разговор потом", "d": "Сейчас не время.", "a": "Вернись через 20–30 минут."},
+      {"t": "5. Что за гневом?", "d": "Под гневом: боль, страх, стыд."},
+      {
+        "t": "6. Разговор потом",
+        "d": "Сейчас не время.",
+        "a": "Вернись через 20–30 минут."
+      },
     ],
-    closing: "Ты не плохой человек. Ты человек, которому больно. 🔥",
+    closing: "Ты не плохой человек. Тебе больно. 🔥",
   ),
   CrisisProtocol(
     emoji: "🩹",
     title: "Тяга к самоповреждению",
-    subtitle: "Хочется порезать/ударить себя",
+    subtitle: "Хочется порезать себя",
     color: const Color(0xFFE8B4D8),
     steps: [
       {"t": "1. Отложи на 15 минут", "d": "Импульс длится недолго.", "a": "Поставь таймер."},
-      {"t": "2. Убери предметы", "d": "Сделай импульс менее доступным."},
-      {"t": "3. Замени ощущение", "d": "Дай мозгу сигнал безопасно.", "a": "Лёд к запястью. Резинка. Холодный душ."},
+      {"t": "2. Убери предметы", "d": "Сделай импульс недоступным."},
+      {
+        "t": "3. Замени ощущение",
+        "d": "Дай мозгу сигнал безопасно.",
+        "a": "Лёд к запястью. Резинка. Холодный душ."
+      },
       {"t": "4. Что ты хочешь почувствовать?", "d": "Контроль? Наказание? Облегчение?"},
-      {"t": "5. Скажи кому-то", "d": "Ты не обязан(а) один(одна).", "a": "«Мне плохо. Мне страшно за себя.»"},
-      {"t": "6. Дыши с задержкой", "d": "Контроль без вреда.", "a": "Вдох 4 → задержка 4 → выдох 4."},
+      {
+        "t": "5. Скажи кому-то",
+        "d": "Ты не один(одна).",
+        "a": "«Мне плохо. Мне страшно за себя.»"
+      },
+      {
+        "t": "6. Дыши с задержкой",
+        "d": "Контроль без вреда.",
+        "a": "Вдох 4 → задержка 4 → выдох 4."
+      },
     ],
     closing: "Ты заслуживаешь не боли, а заботы. 🩹",
   ),
   CrisisProtocol(
     emoji: "💧",
     title: "Истерика / слёзы",
-    subtitle: "Не могу остановиться плакать",
+    subtitle: "Не могу остановиться",
     color: const Color(0xFFA9DEF9),
     steps: [
       {"t": "1. Позволь плакать", "d": "Слёзы лечат.", "a": "«Я имею право плакать.»"},
-      {"t": "2. Безопасное место", "d": "Сядь. Обопрись. Укройся пледом."},
+      {"t": "2. Безопасное место", "d": "Сядь. Укройся пледом."},
       {"t": "3. Удлинённый выдох", "d": "Вдох 4 → выдох 8.", "a": "10 циклов."},
       {"t": "4. Телесный контакт", "d": "Обними себя.", "a": "«Я с тобой.»"},
       {"t": "5. Вода", "d": "Выпей стакан воды."},
       {"t": "6. Один ориентир", "d": "Опиши 1 предмет вслух."},
     ],
-    closing: "Слёзы — язык, на котором тело говорит «мне больно». 🌸",
+    closing: "Слёзы — язык тела. 🌸",
   ),
   CrisisProtocol(
     emoji: "🌫",
@@ -275,13 +406,75 @@ final List<CrisisProtocol> crisisProtocols = [
     color: const Color(0xFFD0F4DE),
     steps: [
       {"t": "1. Это защита", "d": "Мозг отключил чувства, чтобы выжить."},
-      {"t": "2. Температура", "d": "Холод или тепло возвращают.", "a": "Холодная вода или горячая чашка."},
+      {
+        "t": "2. Температура",
+        "d": "Холод или тепло возвращают.",
+        "a": "Холодная вода или горячая чашка."
+      },
       {"t": "3. Заземление 5-4-3-2-1", "d": "По одному на орган чувств."},
       {"t": "4. Движение", "d": "Диссоциация — замирание.", "a": "Потопай, похлопай себя."},
-      {"t": "5. Скажи вслух", "d": "Проговори факты о себе.", "a": "«Меня зовут ___. Я в комнате, я в безопасности.»"},
-      {"t": "6. Связь с другим", "d": "Голос возвращает.", "a": "Позвони или включи знакомый голос."},
+      {
+        "t": "5. Скажи вслух",
+        "d": "Проговори факты о себе.",
+        "a": "«Меня зовут ___. Я в комнате, я в безопасности.»"
+      },
+      {"t": "6. Связь с другим", "d": "Голос возвращает.", "a": "Позвони кому-то."},
     ],
     closing: "Ты возвращаешься. Каждый шаг — якорь. 🌫",
+  ),
+];
+
+// ==========================================
+// 🎭 ПЕРСОНАЖИ
+// ==========================================
+class RoleCharacter {
+  final String emoji;
+  final String name;
+  final String prompt;
+  final Color color;
+  const RoleCharacter({
+    required this.emoji,
+    required this.name,
+    required this.prompt,
+    required this.color,
+  });
+}
+
+final List<RoleCharacter> roleCharacters = [
+  RoleCharacter(
+    emoji: "🏛",
+    name: "Сократ",
+    color: const Color(0xFFC4E4FF),
+    prompt:
+        'Ты — Сократ. Задаёшь глубокие вопросы, не даёшь готовых ответов. Помогаешь человеку самому прийти к истине через диалог. Говори мудро, но просто, по-русски. Задавай по одному вопросу.',
+  ),
+  RoleCharacter(
+    emoji: "👵",
+    name: "Строгая бабушка",
+    color: const Color(0xFFFFDAB9),
+    prompt:
+        'Ты — строгая, но любящая бабушка. Говоришь прямо, без сюсюканья. Можешь сказать «не ной», но всегда с любовью. Даёшь жизненные советы из опыта.',
+  ),
+  RoleCharacter(
+    emoji: "💪",
+    name: "Тренер",
+    color: const Color(0xFFB8E6D5),
+    prompt:
+        'Ты — жёсткий, но справедливый тренер. Мотивируешь, не даёшь себя жалеть. Говоришь короткими фразами. Спрашиваешь: «Что ты можешь сделать прямо сейчас?»',
+  ),
+  RoleCharacter(
+    emoji: "🧒",
+    name: "Внутренний ребёнок",
+    color: const Color(0xFFFFB6C1),
+    prompt:
+        'Ты — внутренний ребёнок человека. Говоришь наивно, искренне, напрямую. Можешь сказать «я боюсь», «мне больно», «я хочу чтобы меня обняли». Помогаешь взрослому услышать свои настоящие чувства.',
+  ),
+  RoleCharacter(
+    emoji: "🔮",
+    name: "Будущий ты",
+    color: const Color(0xFFC77DFF),
+    prompt:
+        'Ты — этот же человек, но через 10 лет. Ты уже прошёл через то, что сейчас у него. Говоришь с теплом и мудростью. Спрашиваешь: «Ты правда этого хочешь или отмазываешься?» Даёшь советы из будущего.',
   ),
 ];
 
@@ -334,7 +527,6 @@ class _RootScreenState extends State<RootScreen> {
     return const MainWindow();
   }
 }
-
 // ==========================================
 // 📝 ЭКРАН РЕГИСТРАЦИИ
 // ==========================================
@@ -534,7 +726,7 @@ class MainWindow extends StatefulWidget {
 }
 
 class _MainWindowState extends State<MainWindow> {
-  int _currentTab = 2; // Главная по умолчанию
+  int _currentTab = 2;
   Widget? _customScreen;
 
   void setCustomScreen(Widget? screen) => setState(() => _customScreen = screen);
@@ -571,19 +763,24 @@ class _MainWindowState extends State<MainWindow> {
     }
 
     return Scaffold(
-      body: SafeArea(child: body),
+      body: SafeArea(bottom: false, child: body),
       bottomNavigationBar: Container(
-        height: 70,
-        color: AppColors.primary,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _nav(Icons.air_rounded, 0),                // Дыхание
-            _nav(Icons.self_improvement, 1),           // Медитация
-            _nav(Icons.home_rounded, 2),               // Главная
-            _nav(Icons.book_rounded, 3),               // Дневник
-            _nav(Icons.person_rounded, 4),             // Профиль
-          ],
+        decoration: const BoxDecoration(color: AppColors.primary),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: 68,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _nav(Icons.air_rounded, 0),
+                _nav(Icons.self_improvement, 1),
+                _nav(Icons.home_rounded, 2),
+                _nav(Icons.book_rounded, 3),
+                _nav(Icons.person_rounded, 4),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -591,9 +788,23 @@ class _MainWindowState extends State<MainWindow> {
 
   Widget _nav(IconData icon, int index) {
     final sel = _customScreen == null && _currentTab == index;
-    return IconButton(
-      icon: Icon(icon, size: 32, color: sel ? Colors.white : Colors.black),
-      onPressed: () => switchTab(index),
+    return GestureDetector(
+      onTap: () => switchTab(index),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.symmetric(horizontal: sel ? 16 : 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: sel ? Colors.white.withValues(alpha: 0.18) : Colors.transparent,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Icon(
+          icon,
+          size: 30,
+          color: sel ? Colors.white : Colors.white60,
+        ),
+      ),
     );
   }
 }
@@ -609,6 +820,13 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _selectedMood = "";
+  late String _tipOfDay;
+
+  @override
+  void initState() {
+    super.initState();
+    _tipOfDay = dailyTips[Random().nextInt(dailyTips.length)];
+  }
 
   String _greeting() {
     final h = DateTime.now().hour;
@@ -668,23 +886,35 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          // ЭКСТРЕННАЯ ПОМОЩЬ — БОЛЬШАЯ КРАСНАЯ КНОПКА
+          const SizedBox(height: 22),
+
+          // SOS кнопка
           GestureDetector(
             onTap: () => MainWindow.of(context)
-                ?.setCustomScreen(const EmergencyScreen()),
+                ?.setCustomScreen(const SosAnchorScreen()),
             child: Container(
               decoration: BoxDecoration(
-                color: AppColors.danger,
-                borderRadius: BorderRadius.circular(12),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFE74C3C), Color(0xFFC0392B)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.danger.withValues(alpha: 0.35),
+                    blurRadius: 14,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
-              padding: const EdgeInsets.symmetric(vertical: 18),
+              padding: const EdgeInsets.symmetric(vertical: 20),
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text("🚨", style: TextStyle(fontSize: 22)),
-                  SizedBox(width: 10),
-                  Text("Экстренная помощь",
+                  Text("🆘", style: TextStyle(fontSize: 24)),
+                  SizedBox(width: 12),
+                  Text("Мне плохо прямо сейчас",
                       style: TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -693,49 +923,77 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          // ИИ-психолог
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.purpleDeep,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              minimumSize: const Size.fromHeight(55),
-              elevation: 0,
-            ),
-            onPressed: () => MainWindow.of(context)
-                ?.setCustomScreen(const AiTherapistScreen()),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text("🤖", style: TextStyle(fontSize: 20)),
-                SizedBox(width: 10),
-                Text("Поговорить с ИИ",
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold)),
-              ],
-            ),
+          const SizedBox(height: 14),
+
+          // Ряд 1: ИИ + Что делать
+          Row(
+            children: [
+              Expanded(
+                child: _bigCard(
+                  emoji: "🤖",
+                  title: "Поговорить с ИИ",
+                  color: AppColors.purpleDeep,
+                  onTap: () => MainWindow.of(context)
+                      ?.setCustomScreen(const AiTherapistScreen()),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _bigCard(
+                  emoji: "🆘",
+                  title: "Что делать если...",
+                  color: AppColors.purpleMedium,
+                  onTap: () => MainWindow.of(context)
+                      ?.setCustomScreen(const SelfHelpScreen()),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
-          // Что делать если...
+          const SizedBox(height: 14),
+
+          // Ряд 2: Роли + Тренажёр
+          Row(
+            children: [
+              Expanded(
+                child: _bigCard(
+                  emoji: "🎭",
+                  title: "Примерка ролей",
+                  color: AppColors.purpleLight,
+                  onTap: () => MainWindow.of(context)
+                      ?.setCustomScreen(const RolePlayScreen()),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _bigCard(
+                  emoji: "🕵️",
+                  title: "Тренажёр разговоров",
+                  color: AppColors.primaryDark,
+                  onTap: () => MainWindow.of(context)
+                      ?.setCustomScreen(const ConversationTrainerScreen()),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Детектор искажений
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.pastelPink,
+              backgroundColor: AppColors.pastelMint,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              minimumSize: const Size.fromHeight(55),
+                  borderRadius: BorderRadius.circular(14)),
+              minimumSize: const Size.fromHeight(56),
               elevation: 0,
             ),
             onPressed: () => MainWindow.of(context)
-                ?.setCustomScreen(const SelfHelpScreen()),
+                ?.setCustomScreen(const DistortionDetectorScreen()),
             child: const Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text("🆘", style: TextStyle(fontSize: 20)),
+                Text("🕵️", style: TextStyle(fontSize: 20)),
                 SizedBox(width: 10),
-                Text("Что делать если...",
+                Text("Детектор когнитивных искажений",
                     style: TextStyle(
                         color: AppColors.text,
                         fontSize: 15,
@@ -744,6 +1002,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 30),
+
+          // Настроение
           const Center(
             child: Text("Как ты себя чувствуешь?",
                 style: TextStyle(
@@ -758,22 +1018,27 @@ class _HomeScreenState extends State<HomeScreen> {
               final isSel = _selectedMood == m["n"];
               return GestureDetector(
                 onTap: () => setState(() => _selectedMood = m["n"]!),
-                child: Container(
-                  padding: const EdgeInsets.all(4),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: EdgeInsets.all(isSel ? 8 : 4),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
+                    color: isSel
+                        ? AppColors.purpleLight.withValues(alpha: 0.3)
+                        : Colors.transparent,
                     border: isSel
                         ? Border.all(color: AppColors.primaryDark, width: 2)
                         : null,
                   ),
                   child: Text(m["e"]!,
                       style: TextStyle(
-                          fontSize: m["n"] == "Счастье" ? 36 : 28)),
+                          fontSize: isSel ? 38 : 32,
+                          height: 1.1)),
                 ),
               );
             }).toList(),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Center(
             child: Text(
               _selectedMood.isEmpty
@@ -787,13 +1052,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: AppColors.primaryDark),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.mint,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(22)),
-              minimumSize: const Size.fromHeight(45),
+              minimumSize: const Size.fromHeight(48),
               elevation: 0,
             ),
             onPressed: _selectedMood.isNotEmpty
@@ -811,35 +1076,149 @@ class _HomeScreenState extends State<HomeScreen> {
                     fontSize: 15,
                     fontWeight: FontWeight.bold)),
           ),
-          const SizedBox(height: 25),
+                 const SizedBox(height: 18),
+
+        // 🎨 Календарь эмоций — новый блок
+        GestureDetector(
+          onTap: () => MainWindow.of(context)
+              ?.setCustomScreen(const EmotionMapScreen()),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.pastelMint,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                const Text("🎨", style: TextStyle(fontSize: 26)),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Календарь эмоций",
+                          style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.text)),
+                      Text("Посмотри прошлые дни",
+                          style: TextStyle(
+                              fontSize: 12, color: AppColors.primaryDark)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios_rounded,
+                    size: 16, color: AppColors.text),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 25),
+
+          // Совет дня
           Container(
             decoration: BoxDecoration(
-              color: const Color(0xFFFFB6D9),
+              gradient: const LinearGradient(
+                colors: [Color(0xFFFFB6D9), Color(0xFFFFC4E0)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               borderRadius: BorderRadius.circular(16),
             ),
             padding: const EdgeInsets.all(20),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("💡  Совет дня",
+                const Text("💡  Совет дня",
                     style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                         color: AppColors.primaryDark)),
-                SizedBox(height: 8),
-                Text("Ты справляешься лучше, чем тебе кажется.",
-                    style: TextStyle(fontSize: 14, color: AppColors.text)),
+                const SizedBox(height: 8),
+                Text(_tipOfDay,
+                    style: const TextStyle(
+                        fontSize: 14, color: AppColors.text, height: 1.4)),
               ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Тепловая карта
+          GestureDetector(
+            onTap: () => MainWindow.of(context)
+                ?.setCustomScreen(const HeatMapScreen()),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Text("🔥", style: TextStyle(fontSize: 28)),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Тепловая карта года",
+                            style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.text)),
+                        Text("Смотри свои эмоциональные паттерны",
+                            style: TextStyle(
+                                fontSize: 12, color: AppColors.primaryDark)),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios_rounded,
+                      size: 16, color: AppColors.text),
+                ],
+              ),
             ),
           ),
         ],
       ),
     );
   }
+
+  Widget _bigCard({
+    required String emoji,
+    required String title,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+        child: Column(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 26)),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ==========================================
-// 🫁 BREATHING SCREEN — 4 ПРАКТИКИ
+// 🫁 BREATHING SCREEN
 // ==========================================
 class BreathingScreen extends StatefulWidget {
   const BreathingScreen({super.key});
@@ -855,7 +1234,7 @@ class _BreathingScreenState extends State<BreathingScreen> {
 
   Timer? _timer;
   int _secondsLeft = 0;
-  int _phase = 0; // 0-вдох, 1-задержка, 2-выдох
+  int _phase = 0;
   int _cycle = 0;
   double _circleSize = 150;
   String _phaseText = "Готов?";
@@ -922,11 +1301,11 @@ class _BreathingScreenState extends State<BreathingScreen> {
     if (_phase == 0) {
       _phaseText = "Вдох...";
       _secondsLeft = inT;
-      _circleSize = 250;
+      _circleSize = 240;
     } else if (_phase == 1) {
       _phaseText = "Задержи...";
       _secondsLeft = holdT;
-      _circleSize = 250;
+      _circleSize = 240;
     } else if (_phase == 2) {
       _phaseText = _practice == "bee" ? "Жужжи..." : "Выдох...";
       _secondsLeft = outT;
@@ -1010,8 +1389,8 @@ class _BreathingScreenState extends State<BreathingScreen> {
             const SizedBox(height: 20),
             Center(
               child: SizedBox(
-                height: 260,
-                width: 260,
+                height: 280,
+                width: 280,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
@@ -1031,11 +1410,11 @@ class _BreathingScreenState extends State<BreathingScreen> {
                             fontWeight: FontWeight.bold,
                             color: AppColors.text)),
                     Positioned(
-                      bottom: 20,
+                      bottom: 30,
                       child: Text(
                         _secondsLeft > 0 ? "$_secondsLeft" : "",
                         style: const TextStyle(
-                            fontSize: 38,
+                            fontSize: 42,
                             fontWeight: FontWeight.bold,
                             color: AppColors.primaryDark),
                       ),
@@ -1044,20 +1423,52 @@ class _BreathingScreenState extends State<BreathingScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 15),
+            const SizedBox(height: 18),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(4, (i) {
+                final done = i < _cycle;
+                final current = i == _cycle;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: current ? 22 : 14,
+                    height: current ? 22 : 14,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: done
+                          ? AppColors.purpleDeep
+                          : current
+                              ? AppColors.purpleLight
+                              : Colors.white.withValues(alpha: 0.6),
+                      border: Border.all(
+                        color: current
+                            ? AppColors.primaryDark
+                            : AppColors.purpleDeep.withValues(alpha: 0.3),
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 8),
             Center(
               child: Text("Цикл: $_cycle / 4",
                   style: const TextStyle(
-                      fontSize: 15, color: AppColors.primaryDark)),
+                      fontSize: 14, color: AppColors.primaryDark)),
             ),
+            const SizedBox(height: 6),
             Center(
               child: Text(_hint,
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
                       fontSize: 13,
                       fontStyle: FontStyle.italic,
                       color: AppColors.purpleDeep)),
             ),
-            const SizedBox(height: 15),
+            const SizedBox(height: 18),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -1142,7 +1553,7 @@ class _BreathingScreenState extends State<BreathingScreen> {
 }
 
 // ==========================================
-// 🧘 MEDITATION SCREEN — 4 медитации
+// 🧘 MEDITATION SCREEN
 // ==========================================
 class MeditationScreen extends StatefulWidget {
   const MeditationScreen({super.key});
@@ -1152,7 +1563,7 @@ class MeditationScreen extends StatefulWidget {
 
 class _MeditationScreenState extends State<MeditationScreen> {
   bool _inSession = false;
-  int _minutes = 5;
+  int _totalSeconds = 0;
   int _secondsLeft = 0;
   Timer? _timer;
   bool _playing = false;
@@ -1162,8 +1573,8 @@ class _MeditationScreenState extends State<MeditationScreen> {
     setState(() {
       _inSession = true;
       _title = title;
-      _minutes = minutes;
-      _secondsLeft = minutes * 60;
+      _totalSeconds = minutes * 60;
+      _secondsLeft = _totalSeconds;
       _playing = false;
     });
   }
@@ -1202,12 +1613,16 @@ class _MeditationScreenState extends State<MeditationScreen> {
   @override
   Widget build(BuildContext context) {
     if (_inSession) {
+      final progress = _totalSeconds == 0
+          ? 0.0
+          : (_totalSeconds - _secondsLeft) / _totalSeconds;
+
       return SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SizedBox(height: 40),
+            const SizedBox(height: 20),
             Center(
               child: Text(_title,
                   textAlign: TextAlign.center,
@@ -1218,26 +1633,43 @@ class _MeditationScreenState extends State<MeditationScreen> {
             ),
             const SizedBox(height: 40),
             Center(
-              child: Container(
-                width: 220,
-                height: 220,
-                decoration: BoxDecoration(
-                  color: AppColors.pastelMint,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.purpleLight.withValues(alpha: 0.4),
-                      blurRadius: 30,
-                      spreadRadius: 10,
+              child: SizedBox(
+                width: 240,
+                height: 240,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox(
+                      width: 220,
+                      height: 220,
+                      child: CircularProgressIndicator(
+                        value: progress,
+                        strokeWidth: 10,
+                        backgroundColor: Colors.white.withValues(alpha: 0.5),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                            AppColors.purpleDeep),
+                      ),
+                    ),
+                    Container(
+                      width: 180,
+                      height: 180,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [AppColors.pastelMint, Color(0xFFB8E6D5)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(_format(_secondsLeft),
+                            style: const TextStyle(
+                                fontSize: 44,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.text)),
+                      ),
                     ),
                   ],
-                ),
-                child: Center(
-                  child: Text(_format(_secondsLeft),
-                      style: const TextStyle(
-                          fontSize: 48,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.text)),
                 ),
               ),
             ),
@@ -1253,7 +1685,7 @@ class _MeditationScreenState extends State<MeditationScreen> {
                     color: AppColors.primaryDark),
               ),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 30),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -1262,11 +1694,11 @@ class _MeditationScreenState extends State<MeditationScreen> {
                     backgroundColor:
                         _playing ? AppColors.pastelPink : AppColors.mint,
                     shape: const CircleBorder(),
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(22),
                   ),
                   onPressed: _togglePlay,
                   child: Text(_playing ? "⏸" : "▶",
-                      style: const TextStyle(fontSize: 24)),
+                      style: const TextStyle(fontSize: 26)),
                 ),
                 const SizedBox(width: 20),
                 ElevatedButton(
@@ -1282,8 +1714,7 @@ class _MeditationScreenState extends State<MeditationScreen> {
                       _playing = false;
                     });
                   },
-                  child: const Text("⏹",
-                      style: TextStyle(fontSize: 24)),
+                  child: const Text("⏹", style: TextStyle(fontSize: 22)),
                 ),
               ],
             ),
@@ -1368,12 +1799,579 @@ class _MeditationScreenState extends State<MeditationScreen> {
     );
   }
 }
+// ==========================================
+// 📔 DIARY SCREEN
+// ==========================================
+class DiaryScreen extends StatefulWidget {
+  const DiaryScreen({super.key});
+  @override
+  State<DiaryScreen> createState() => _DiaryScreenState();
+}
+
+class _DiaryScreenState extends State<DiaryScreen> {
+  bool _showForm = false;
+  String _type = "Идея";
+  final _text = TextEditingController();
+  final List<String> _types = ["Идея", "Благодарность", "Неудача", "Успех"];
+
+  String _emoji(String t) {
+    switch (t) {
+      case "Идея":
+        return "💡";
+      case "Благодарность":
+        return "🙏";
+      case "Неудача":
+        return "😔";
+      case "Успех":
+        return "🎉";
+      default:
+        return "📝";
+    }
+  }
+
+  Color _color(String t) {
+    switch (t) {
+      case "Идея":
+        return AppColors.pastelYellow;
+      case "Благодарность":
+        return AppColors.pastelGreen;
+      case "Неудача":
+        return AppColors.pastelPink;
+      case "Успех":
+        return AppColors.pastelMint;
+      default:
+        return AppColors.background;
+    }
+  }
+
+  String _dayLabel(DateTime d) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(d.year, d.month, d.day);
+    final diff = today.difference(target).inDays;
+
+    if (diff == 0) return "Сегодня";
+    if (diff == 1) return "Вчера";
+    if (diff < 7) return "$diff дня назад";
+    return "${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}";
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Map<String, List<DiaryEntry>> grouped = {};
+    for (final e in AppState.entries) {
+      final key = "${e.date.year}-${e.date.month}-${e.date.day}";
+      grouped.putIfAbsent(key, () => []).add(e);
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text("📔  Дневник",
+              style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.text)),
+          const SizedBox(height: 5),
+          const Text("Твои мысли, победы и уроки",
+              style: TextStyle(
+                  fontSize: 13,
+                  fontStyle: FontStyle.italic,
+                  color: AppColors.primaryDark)),
+          const SizedBox(height: 20),
+
+          if (!_showForm)
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.mint,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25)),
+                minimumSize: const Size.fromHeight(50),
+              ),
+              onPressed: () => setState(() => _showForm = true),
+              child: const Text("➕  Новая запись",
+                  style: TextStyle(
+                      color: AppColors.text,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold)),
+            ),
+
+          if (_showForm) ...[
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              padding: const EdgeInsets.all(15),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text("Новая запись",
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.text)),
+                  const SizedBox(height: 12),
+                  const Text("Тип записи",
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primaryDark)),
+                  const SizedBox(height: 6),
+                  DropdownButton<String>(
+                    value: _type,
+                    isExpanded: true,
+                    items: _types
+                        .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                        .toList(),
+                    onChanged: (v) => setState(() => _type = v!),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text("Текст",
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primaryDark)),
+                  const SizedBox(height: 6),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8F8F8),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: const EdgeInsets.all(10),
+                    child: TextField(
+                      controller: _text,
+                      maxLines: 5,
+                      decoration:
+                          const InputDecoration(border: InputBorder.none),
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.mint),
+                        onPressed: () {
+                          if (_text.text.trim().isEmpty) return;
+                          AppState.addEntry(DiaryEntry(
+                            type: _type,
+                            text: _text.text.trim(),
+                            emoji: _emoji(_type),
+                          ));
+                          _text.clear();
+                          setState(() => _showForm = false);
+                        },
+                        child: const Text("Сохранить"),
+                      ),
+                      const SizedBox(width: 10),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.background),
+                        onPressed: () => setState(() => _showForm = false),
+                        child: const Text("Отмена"),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 15),
+          ],
+
+          if (AppState.entries.isEmpty)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.only(top: 30),
+                child: Text("Пока нет записей. Нажми «➕ Новая запись»!",
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontStyle: FontStyle.italic,
+                        color: AppColors.primaryDark)),
+              ),
+            ),
+
+          ...grouped.entries.map((groupEntry) {
+            final dayEntries = groupEntry.value;
+            final firstDate = dayEntries.first.date;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 12, bottom: 8, left: 4),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.purpleDeep,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          _dayLabel(firstDate),
+                          style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "${dayEntries.length} ${dayEntries.length == 1 ? "запись" : "записей"}",
+                        style: const TextStyle(
+                            fontSize: 11, color: AppColors.primaryDark),
+                      ),
+                    ],
+                  ),
+                ),
+                ...dayEntries.map((e) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: _color(e.type),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(e.emoji,
+                                style: const TextStyle(fontSize: 20)),
+                            const SizedBox(width: 8),
+                            Text(e.type,
+                                style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.text)),
+                            const Spacer(),
+                            Text(
+                              "${e.date.hour.toString().padLeft(2, '0')}:${e.date.minute.toString().padLeft(2, '0')}",
+                              style: const TextStyle(
+                                  fontSize: 11, color: AppColors.primaryDark),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(e.text,
+                            style: const TextStyle(
+                                fontSize: 14,
+                                color: AppColors.text,
+                                height: 1.4)),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
 
 // ==========================================
-// 🆘 EMERGENCY SCREEN
+// 👤 PROFILE SCREEN
 // ==========================================
-class EmergencyScreen extends StatelessWidget {
-  const EmergencyScreen({super.key});
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    int days = 1;
+    final dates = [
+      ...AppState.moods.map((m) => m.date),
+      ...AppState.entries.map((e) => e.date),
+    ];
+    if (dates.isNotEmpty) {
+      dates.sort();
+      days = DateTime.now().difference(dates.first).inDays + 1;
+      if (days < 1) days = 1;
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 110,
+              height: 110,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+                border: Border.all(color: AppColors.mint, width: 4),
+              ),
+              child: Center(
+                child: Text(AppState.avatar.isEmpty ? "🌸" : AppState.avatar,
+                    style: const TextStyle(fontSize: 60)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 15),
+          Center(
+            child: Text(AppState.userName.isEmpty ? "Друг" : AppState.userName,
+                style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.text)),
+          ),
+          Center(
+            child: Text(
+                AppState.age.isEmpty ? "Возраст не указан" : "${AppState.age} лет",
+                style: const TextStyle(
+                    fontSize: 14, color: AppColors.primaryDark)),
+          ),
+          const SizedBox(height: 25),
+
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                const Text("📊  Прогресс",
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.text)),
+                const SizedBox(height: 15),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _stat(AppState.moods.length.toString(), "Отметок",
+                        AppColors.purpleDeep),
+                    _stat(AppState.entries.length.toString(), "Записей",
+                        AppColors.purpleLight),
+                    _stat(days.toString(), "Дней", AppColors.purpleMedium),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 15),
+
+          Row(
+            children: [
+              Expanded(
+                child: _bigButton(
+                  emoji: "🎨",
+                  title: "Карта эмоций",
+                  color: AppColors.pastelMint,
+                  onTap: () => MainWindow.of(context)
+                      ?.setCustomScreen(const HeatMapScreen()),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _bigButton(
+                  emoji: "🔗",
+                  title: "Полезные ссылки",
+                  color: AppColors.pastelBlue,
+                  onTap: () => MainWindow.of(context)
+                      ?.setCustomScreen(const LinksScreen()),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 15),
+
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.pastelGreen,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            padding: const EdgeInsets.all(15),
+            child: const Row(
+              children: [
+                Text("🔒", style: TextStyle(fontSize: 22)),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    "Все данные хранятся только у тебя на устройстве.",
+                    style: TextStyle(fontSize: 12, color: AppColors.text),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.pastelPink,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(22)),
+              minimumSize: const Size.fromHeight(48),
+            ),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text("Сброс данных"),
+                  content: const Text("Точно удалить ВСЕ данные?"),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text("Нет")),
+                    TextButton(
+                      onPressed: () {
+                        AppState.clear();
+                        Navigator.pop(ctx);
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (_) => const PsyApp()),
+                          (r) => false,
+                        );
+                      },
+                      child: const Text("Да"),
+                    ),
+                  ],
+                ),
+              );
+            },
+            child: const Text("🗑  Сбросить все данные",
+                style: TextStyle(
+                    color: AppColors.text,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _stat(String c, String l, Color color) {
+    return Column(
+      children: [
+        Text(c,
+            style: TextStyle(
+                fontSize: 28, fontWeight: FontWeight.bold, color: color)),
+        Text(l,
+            style: const TextStyle(fontSize: 12, color: AppColors.primaryDark)),
+      ],
+    );
+  }
+
+  Widget _bigButton({
+    required String emoji,
+    required String title,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 110,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 30)),
+            const SizedBox(height: 6),
+            Text(title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.text)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==========================================
+// 🆘 SOS ANCHOR SCREEN
+// ==========================================
+class SosAnchorScreen extends StatefulWidget {
+  const SosAnchorScreen({super.key});
+  @override
+  State<SosAnchorScreen> createState() => _SosAnchorScreenState();
+}
+
+class _SosAnchorScreenState extends State<SosAnchorScreen> {
+  int _phase = 0;
+  int _secondsLeft = 4;
+  Timer? _timer;
+  bool _running = false;
+  String _phaseText = "Готов?";
+
+  void _start() {
+    setState(() {
+      _running = true;
+      _phase = 0;
+      _secondsLeft = 4;
+      _phaseText = "Вдох...";
+    });
+    _tick();
+    _vibrate();
+  }
+
+  void _vibrate() async {
+    try {
+      final hasVib = await Vibration.hasVibrator();
+      if (hasVib == true) {
+        Vibration.vibrate(duration: 200);
+      }
+    } catch (_) {}
+  }
+
+  void _tick() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      setState(() => _secondsLeft--);
+      if (_secondsLeft <= 0) {
+        _vibrate();
+        if (_phase == 0) {
+          setState(() {
+            _phase = 1;
+            _secondsLeft = 7;
+            _phaseText = "Задержи...";
+          });
+        } else if (_phase == 1) {
+          setState(() {
+            _phase = 2;
+            _secondsLeft = 8;
+            _phaseText = "Выдох...";
+          });
+        } else {
+          setState(() {
+            _phase = 0;
+            _secondsLeft = 4;
+            _phaseText = "Вдох...";
+          });
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1382,7 +2380,7 @@ class EmergencyScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: const Color(0xFFFFE5E5),
         elevation: 0,
-        title: const Text("🚨  Экстренная помощь",
+        title: const Text("🆘  Якорь",
             style: TextStyle(
                 color: AppColors.danger, fontWeight: FontWeight.bold)),
         iconTheme: const IconThemeData(color: AppColors.danger),
@@ -1394,200 +2392,116 @@ class EmergencyScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Center(
-                child: Text("Тебе плохо прямо сейчас?",
+                child: Text("Я здесь. Я в безопасности.",
                     style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
                         color: AppColors.text)),
               ),
-              const SizedBox(height: 5),
+              const SizedBox(height: 8),
               const Center(
-                child: Text("Ты не один(а). Давай вместе.",
-                    style: TextStyle(
-                        fontSize: 14, color: AppColors.primaryDark)),
+                child: Text(
+                  "Нажми «Начать» и дыши с нами.\nТелефон будет тихонько вибрировать в ритм.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 13, color: AppColors.primaryDark),
+                ),
               ),
-              const SizedBox(height: 25),
+              const SizedBox(height: 30),
+              Center(
+                child: Container(
+                  width: 220,
+                  height: 220,
+                  decoration: BoxDecoration(
+                    color: AppColors.mint.withValues(alpha: 0.6),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.mint.withValues(alpha: 0.5),
+                        blurRadius: _running ? 40 : 10,
+                        spreadRadius: _running ? 20 : 5,
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(_phaseText,
+                            style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.text)),
+                        const SizedBox(height: 8),
+                        Text(_running ? "$_secondsLeft" : "—",
+                            style: const TextStyle(
+                                fontSize: 48,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primaryDark)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 30),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor:
+                      _running ? AppColors.pastelPink : AppColors.mint,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(22)),
+                  minimumSize: const Size.fromHeight(52),
+                ),
+                onPressed: () {
+                  if (_running) {
+                    _timer?.cancel();
+                    setState(() {
+                      _running = false;
+                      _phaseText = "Стоп";
+                      _secondsLeft = 0;
+                    });
+                  } else {
+                    _start();
+                  }
+                },
+                child: Text(_running ? "Стоп" : "▶  Начать дыхание",
+                    style: const TextStyle(
+                        color: AppColors.text,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(height: 20),
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                padding: const EdgeInsets.all(20),
-                child: Column(
+                padding: const EdgeInsets.all(16),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("☎  ТЕЛЕФОН ДОВЕРИЯ",
+                    Text("Если совсем тяжело:",
                         style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.primaryDark)),
-                    const SizedBox(height: 8),
-                    const Text("8 801 100 16 11",
+                            color: AppColors.text)),
+                    SizedBox(height: 6),
+                    Text("☎  Телефон доверия: 8 801 100 16 11",
                         style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.danger)),
-                    const Text("Анонимно, круглосуточно, бесплатно",
+                            fontSize: 13, color: AppColors.text)),
+                    Text("📝  Напиши близкому: «Мне плохо, побудь со мной»",
                         style: TextStyle(
-                            fontSize: 12,
-                            fontStyle: FontStyle.italic,
-                            color: AppColors.primaryDark)),
-                    const SizedBox(height: 15),
-                    const Text(
-                      "Тебя не заберут, если нет прямой угрозы жизни.\nТебе просто помогут.",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 13, color: AppColors.text),
-                    ),
+                            fontSize: 13, color: AppColors.text)),
+                    Text("🚶  Умойся холодной водой",
+                        style: TextStyle(
+                            fontSize: 13, color: AppColors.text)),
+                    Text("🧊  Лёд к запястью на 30 секунд",
+                        style: TextStyle(
+                            fontSize: 13, color: AppColors.text)),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
-              const Text("Что делать прямо сейчас:",
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.text)),
-              const SizedBox(height: 10),
-              _actionCard("🌬", "Дыхание 4-7-8", "Вдох 4 → задержка 7 → выдох 8",
-                  AppColors.pastelGreen, () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const _EmergencyBreathing()),
-                );
-              }),
-              _actionCard("🌊", "Квадратное дыхание",
-                  "4 сек вдох → 4 пауза → 4 выдох → 4 пауза",
-                  AppColors.pastelBlue, () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const _EmergencyBreathing()),
-                );
-              }),
-              _actionCard("🧘", "Заземление 5-4-3-2-1",
-                  "5 вижу, 4 слышу, 3 ощущаю, 2 запаха, 1 вкус",
-                  AppColors.pastelPeach, () {
-                showDialog(
-                  context: context,
-                  builder: (_) => const AlertDialog(
-                    title: Text("Заземление"),
-                    content: Text(
-                        "5 — вещей, которые видишь\n4 — звука, которые слышишь\n3 — предмета, которых касаешься\n2 — запаха, которые чувствуешь\n1 — вкус, который ощущаешь"),
-                  ),
-                );
-              }),
-              const SizedBox(height: 15),
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFB6D9),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                padding: const EdgeInsets.all(20),
-                child: const Text(
-                  "«Это пройдёт. Ты справишься. Ты уже справляешься.»",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primaryDark),
-                ),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.mint,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(22)),
-                  minimumSize: const Size.fromHeight(50),
-                ),
-                onPressed: () =>
-                    MainWindow.of(context)?.setCustomScreen(null),
-                child: const Text("Мне уже лучше 💜",
-                    style: TextStyle(
-                        color: AppColors.text,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold)),
-              ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _actionCard(String emoji, String title, String subtitle, Color bg,
-      VoidCallback onTap) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration:
-          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(14)),
-      padding: const EdgeInsets.all(15),
-      child: Row(
-        children: [
-          Text(emoji, style: const TextStyle(fontSize: 32)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.text)),
-                Text(subtitle,
-                    style: const TextStyle(
-                        fontSize: 12, color: AppColors.primaryDark)),
-              ],
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              shape: const CircleBorder(),
-              padding: const EdgeInsets.all(10),
-              elevation: 0,
-            ),
-            onPressed: onTap,
-            child: const Text("▶",
-                style: TextStyle(
-                    color: AppColors.purpleDeep,
-                    fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// Простой экран дыхания для экстренной помощи
-class _EmergencyBreathing extends StatefulWidget {
-  const _EmergencyBreathing();
-  @override
-  State<_EmergencyBreathing> createState() => _EmergencyBreathingState();
-}
-
-class _EmergencyBreathingState extends State<_EmergencyBreathing> {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        title: const Text("Дыхание 4-7-8",
-            style: TextStyle(
-                color: AppColors.text, fontWeight: FontWeight.bold)),
-        iconTheme: const IconThemeData(color: AppColors.text),
-      ),
-      body: const Center(
-        child: Padding(
-          padding: EdgeInsets.all(20),
-          child: Text(
-            "Дыши с нами:\n\n1. Вдох на 4 секунды\n2. Задержка на 7 секунд\n3. Выдох на 8 секунд\n\nПовтори 4 раза.\n\n💜 Ты справляешься.",
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                fontSize: 18, height: 1.6, color: AppColors.text),
           ),
         ),
       ),
@@ -1619,6 +2533,15 @@ class SelfHelpScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const Center(
+                child: Text("Пошаговые протоколы самопомощи",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
+                        color: AppColors.primaryDark)),
+              ),
+              const SizedBox(height: 20),
               ...crisisProtocols.map((p) => _card(context, p)),
               const SizedBox(height: 15),
               Container(
@@ -1670,6 +2593,22 @@ class SelfHelpScreen extends StatelessWidget {
                   Text(p.subtitle,
                       style: const TextStyle(
                           fontSize: 13, color: AppColors.primaryDark)),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      "${p.steps.length} шагов",
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.purpleDeep),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1746,7 +2685,8 @@ class ProtocolDetailScreen extends StatelessWidget {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text("👉 ", style: TextStyle(fontSize: 14)),
+                              const Text("👉 ",
+                                  style: TextStyle(fontSize: 14)),
                               Expanded(
                                 child: Text(s["a"]!,
                                     style: const TextStyle(
@@ -1815,7 +2755,7 @@ class _AiTherapistScreenState extends State<AiTherapistScreen> {
         _messages.add(ChatMessage(
             role: 'assistant',
             content:
-                'Извини, ключ Groq не введён. Закрой приложение и введи ключ при регистрации, или перезапусти приложение.\n\nПока могу предложить: открой «Что делать если...» — там есть готовые техники.'));
+                'Извини, ключ Groq не введён.\n\nЗакрой приложение и введи ключ при регистрации, или сбрось данные в профиле и заново введи.'));
       });
       _controller.clear();
       _scrollDown();
@@ -1830,7 +2770,7 @@ class _AiTherapistScreenState extends State<AiTherapistScreen> {
     _scrollDown();
 
     try {
-      final ai = AiService(AppState.apiKey);
+      final ai = AiService(apiKey: AppState.apiKey);
       final reply = await ai.chat(_messages);
       setState(() {
         _messages.add(ChatMessage(role: 'assistant', content: reply));
@@ -1838,9 +2778,8 @@ class _AiTherapistScreenState extends State<AiTherapistScreen> {
       });
     } catch (e) {
       setState(() {
-        _messages.add(ChatMessage(
-            role: 'assistant',
-            content: 'Ошибка: $e'));
+        _messages.add(
+            ChatMessage(role: 'assistant', content: 'Ошибка: $e'));
         _loading = false;
       });
     }
@@ -1864,8 +2803,33 @@ class _AiTherapistScreenState extends State<AiTherapistScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         elevation: 0,
-        title: const Text("🤖  ИИ-психолог",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: const BoxDecoration(
+                color: Colors.white24,
+                shape: BoxShape.circle,
+              ),
+              child: const Center(
+                  child: Text("🤖", style: TextStyle(fontSize: 20))),
+            ),
+            const SizedBox(width: 10),
+            const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("Карманный психолог",
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold)),
+                Text("всегда рядом 💜",
+                    style: TextStyle(color: Colors.white70, fontSize: 11)),
+              ],
+            ),
+          ],
+        ),
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
@@ -1974,188 +2938,156 @@ class _AiTherapistScreenState extends State<AiTherapistScreen> {
 }
 
 // ==========================================
-// 📔 DIARY SCREEN
+// 🎭 ROLE PLAY SCREEN
 // ==========================================
-class DiaryScreen extends StatefulWidget {
-  const DiaryScreen({super.key});
+class RolePlayScreen extends StatefulWidget {
+  const RolePlayScreen({super.key});
   @override
-  State<DiaryScreen> createState() => _DiaryScreenState();
+  State<RolePlayScreen> createState() => _RolePlayScreenState();
 }
 
-class _DiaryScreenState extends State<DiaryScreen> {
-  bool _showForm = false;
-  String _type = "Идея";
-  final _text = TextEditingController();
-  final List<String> _types = ["Идея", "Благодарность", "Неудача", "Успех"];
+class _RolePlayScreenState extends State<RolePlayScreen> {
+  RoleCharacter? _selected;
+  final _controller = TextEditingController();
+  final _scroll = ScrollController();
+  final List<ChatMessage> _messages = [];
+  bool _loading = false;
 
-  String _emoji(String t) {
-    switch (t) {
-      case "Идея":
-        return "💡";
-      case "Благодарность":
-        return "🙏";
-      case "Неудача":
-        return "😔";
-      case "Успех":
-        return "🎉";
-      default:
-        return "📝";
-    }
+  void _selectCharacter(RoleCharacter c) {
+    setState(() {
+      _selected = c;
+      _messages.clear();
+      _messages.add(ChatMessage(
+          role: 'assistant',
+          content:
+              '${c.emoji} Я — ${c.name}. Расскажи, что тебя беспокоит.'));
+    });
   }
 
-  Color _color(String t) {
-    switch (t) {
-      case "Идея":
-        return AppColors.pastelYellow;
-      case "Благодарность":
-        return AppColors.pastelGreen;
-      case "Неудача":
-        return AppColors.pastelPink;
-      case "Успех":
-        return AppColors.pastelMint;
-      default:
-        return AppColors.background;
+  Future<void> _send() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty || _loading || _selected == null) return;
+
+    if (AppState.apiKey.isEmpty) {
+      setState(() {
+        _messages.add(ChatMessage(role: 'user', content: text));
+        _messages.add(ChatMessage(
+            role: 'assistant',
+            content: '⚠ Ключ Groq не введён. Сбрось данные в профиле и введи ключ.'));
+      });
+      _controller.clear();
+      _scrollDown();
+      return;
     }
+
+    setState(() {
+      _messages.add(ChatMessage(role: 'user', content: text));
+      _loading = true;
+    });
+    _controller.clear();
+    _scrollDown();
+
+    try {
+      final ai = AiService(apiKey: AppState.apiKey, prompt: _selected!.prompt);
+      final reply = await ai.chat(_messages);
+      setState(() {
+        _messages.add(ChatMessage(role: 'assistant', content: reply));
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _messages
+            .add(ChatMessage(role: 'assistant', content: 'Ошибка: $e'));
+        _loading = false;
+      });
+    }
+    _scrollDown();
+  }
+
+  void _scrollDown() {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_scroll.hasClients) {
+        _scroll.animateTo(_scroll.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut);
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.primary,
+        elevation: 0,
+        title: Text(
+            _selected == null
+                ? "🎭  Примерка ролей"
+                : "${_selected!.emoji}  ${_selected!.name}",
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold)),
+        iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          if (_selected != null)
+            IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              tooltip: "К выбору роли",
+              onPressed: () => setState(() {
+                _selected = null;
+                _messages.clear();
+              }),
+            ),
+        ],
+      ),
+      body: SafeArea(
+        child: _selected == null ? _characterList() : _chatView(),
+      ),
+    );
+  }
+
+  Widget _characterList() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text("📔  Дневник",
+          const Text("Выбери, кто с тобой поговорит",
               style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
                   color: AppColors.text)),
+          const SizedBox(height: 5),
+          const Text(
+            "Каждый персонаж говорит по-своему. Попробуй разные — услышишь себя с новой стороны.",
+            style: TextStyle(fontSize: 13, color: AppColors.primaryDark),
+          ),
           const SizedBox(height: 20),
-          if (!_showForm)
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.mint,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25)),
-                minimumSize: const Size.fromHeight(50),
-              ),
-              onPressed: () => setState(() => _showForm = true),
-              child: const Text("➕  Новая запись",
-                  style: TextStyle(
-                      color: AppColors.text,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold)),
-            ),
-          if (_showForm) ...[
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              padding: const EdgeInsets.all(15),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  DropdownButton<String>(
-                    value: _type,
-                    isExpanded: true,
-                    items: _types
-                        .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                        .toList(),
-                    onChanged: (v) => setState(() => _type = v!),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8F8F8),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    padding: const EdgeInsets.all(10),
-                    child: TextField(
-                      controller: _text,
-                      maxLines: 4,
-                      decoration:
-                          const InputDecoration(border: InputBorder.none),
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.mint),
-                        onPressed: () {
-                          if (_text.text.trim().isEmpty) return;
-                          AppState.addEntry(DiaryEntry(
-                            type: _type,
-                            text: _text.text.trim(),
-                            emoji: _emoji(_type),
-                          ));
-                          _text.clear();
-                          setState(() => _showForm = false);
-                        },
-                        child: const Text("Сохранить"),
-                      ),
-                      const SizedBox(width: 10),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.background),
-                        onPressed: () => setState(() => _showForm = false),
-                        child: const Text("Отмена"),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 15),
-          ],
-          if (AppState.entries.isEmpty)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.only(top: 30),
-                child: Text("Пока нет записей. Нажми «➕ Новая запись»!",
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontStyle: FontStyle.italic,
-                        color: AppColors.primaryDark)),
-              ),
-            ),
-          ...AppState.entries.map((e) {
-            return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              decoration: BoxDecoration(
-                color: _color(e.type),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              padding: const EdgeInsets.all(15),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(e.emoji, style: const TextStyle(fontSize: 20)),
-                      const SizedBox(width: 8),
-                      Text(e.type,
+          ...roleCharacters.map((c) {
+            return GestureDetector(
+              onTap: () => _selectCharacter(c),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: c.color,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                padding: const EdgeInsets.all(18),
+                child: Row(
+                  children: [
+                    Text(c.emoji, style: const TextStyle(fontSize: 36)),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(c.name,
                           style: const TextStyle(
-                              fontSize: 14,
+                              fontSize: 17,
                               fontWeight: FontWeight.bold,
                               color: AppColors.text)),
-                      const SizedBox(width: 8),
-                      Text(
-                        "${e.date.day.toString().padLeft(2, '0')}.${e.date.month.toString().padLeft(2, '0')} ${e.date.hour.toString().padLeft(2, '0')}:${e.date.minute.toString().padLeft(2, '0')}",
-                        style: const TextStyle(
-                            fontSize: 11, color: AppColors.primaryDark),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(e.text,
-                      style: const TextStyle(
-                          fontSize: 13, color: AppColors.text)),
-                ],
+                    ),
+                    const Icon(Icons.arrow_forward_ios_rounded,
+                        size: 18, color: AppColors.text),
+                  ],
+                ),
               ),
             );
           }),
@@ -2163,202 +3095,578 @@ class _DiaryScreenState extends State<DiaryScreen> {
       ),
     );
   }
+
+  Widget _chatView() {
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.builder(
+            controller: _scroll,
+            padding: const EdgeInsets.all(16),
+            itemCount: _messages.length,
+            itemBuilder: (context, i) {
+              final m = _messages[i];
+              final isUser = m.role == 'user';
+              return Align(
+                alignment:
+                    isUser ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(14),
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.78,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isUser
+                        ? AppColors.purpleDeep
+                        : (_selected?.color ?? Colors.white),
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(16),
+                      topRight: const Radius.circular(16),
+                      bottomLeft: Radius.circular(isUser ? 16 : 4),
+                      bottomRight: Radius.circular(isUser ? 4 : 16),
+                    ),
+                  ),
+                  child: Text(
+                    m.content,
+                    style: TextStyle(
+                      fontSize: 15,
+                      height: 1.4,
+                      color: isUser ? Colors.white : AppColors.text,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        if (_loading)
+          const Padding(
+            padding: EdgeInsets.all(8),
+            child: Text('печатает...',
+                style: TextStyle(
+                    fontStyle: FontStyle.italic,
+                    color: AppColors.primaryDark)),
+          ),
+        Container(
+          padding: const EdgeInsets.all(12),
+          color: Colors.white,
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.background.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: TextField(
+                    controller: _controller,
+                    maxLines: null,
+                    decoration: const InputDecoration(
+                      hintText: 'Ответь...',
+                      border: InputBorder.none,
+                    ),
+                    onSubmitted: (_) => _send(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                decoration: const BoxDecoration(
+                  color: AppColors.purpleDeep,
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.send, color: Colors.white),
+                  onPressed: _loading ? null : _send,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+// ==========================================
+// 🕵️ DISTORTION DETECTOR SCREEN
+// ==========================================
+class DistortionDetectorScreen extends StatefulWidget {
+  const DistortionDetectorScreen({super.key});
+  @override
+  State<DistortionDetectorScreen> createState() =>
+      _DistortionDetectorScreenState();
 }
 
-// ==========================================
-// 👤 PROFILE SCREEN
-// ==========================================
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
+class _DistortionDetectorScreenState extends State<DistortionDetectorScreen> {
+  final _controller = TextEditingController();
+  String _result = "";
+  bool _loading = false;
+
+  Future<void> _analyze() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+
+    if (AppState.apiKey.isEmpty) {
+      setState(() {
+        _result =
+            '⚠ Ключ Groq не введён.\n\nСбрось данные в профиле и введи ключ заново.';
+      });
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _result = "";
+    });
+
+    const detectorPrompt = '''
+Ты — детектор когнитивных искажений. Анализируй мысль человека и находи искажения.
+
+ВОЗМОЖНЫЕ ИСКАЖЕНИЯ:
+- Катастрофизация
+- Чёрно-белое мышление
+- Чтение мыслей
+- Обобщение («всегда/никогда»)
+- Обесценивание хорошего
+- Долженствование («я должен»)
+- Персонализация
+
+ФОРМАТ ОТВЕТА:
+🎯 Искажение: [название]
+💭 Что происходит: [объясни простыми словами]
+🔄 А что если наоборот: [контраргумент]
+💜 Поддержка: [1 фраза]
+
+Отвечай коротко, по-дружески, по-русски. Используй эмодзи.
+''';
+
+    try {
+      final ai = AiService(apiKey: AppState.apiKey, prompt: detectorPrompt);
+      final reply = await ai.chat([
+        ChatMessage(role: 'user', content: text),
+      ]);
+      setState(() {
+        _result = reply;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _result = 'Ошибка: $e';
+        _loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    int days = 1;
-    final dates = [
-      ...AppState.moods.map((m) => m.date),
-      ...AppState.entries.map((e) => e.date),
-    ];
-    if (dates.isNotEmpty) {
-      dates.sort();
-      days = DateTime.now().difference(dates.first).inDays + 1;
-      if (days < 1) days = 1;
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.primary,
+        elevation: 0,
+        title: const Text("🕵️  Детектор искажений",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                "Напиши свою мысль. Я найду когнитивное искажение и предложу контраргумент.",
+                style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.primaryDark,
+                    height: 1.4),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                padding: const EdgeInsets.all(14),
+                child: TextField(
+                  controller: _controller,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    hintText:
+                        "Например: «Я провалил экзамен, значит я ничтожество»",
+                    hintStyle: TextStyle(color: Colors.grey, fontSize: 13),
+                  ),
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ),
+              const SizedBox(height: 14),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.purpleDeep,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(22)),
+                  minimumSize: const Size.fromHeight(50),
+                ),
+                onPressed: _loading ? null : _analyze,
+                child: _loading
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2))
+                    : const Text("🧠  Найти искажение",
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15)),
+              ),
+              if (_result.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  padding: const EdgeInsets.all(18),
+                  child: Text(_result,
+                      style: const TextStyle(
+                          fontSize: 14, color: AppColors.text, height: 1.5)),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.background,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20)),
+                    minimumSize: const Size.fromHeight(44),
+                  ),
+                  onPressed: () => setState(() {
+                    _controller.clear();
+                    _result = "";
+                  }),
+                  child: const Text("🔄 Ещё раз"),
+                ),
+              ],
+              const SizedBox(height: 20),
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.pastelYellow,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                padding: const EdgeInsets.all(14),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("💡 Все люди иногда искажают реальность.",
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.text)),
+                    SizedBox(height: 4),
+                    Text(
+                        "Это не «с тобой что-то не так». Это работа мозга. Мы просто учимся её замечать.",
+                        style:
+                            TextStyle(fontSize: 12, color: AppColors.text)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ==========================================
+// 💬 CONVERSATION TRAINER SCREEN
+// ==========================================
+class ConversationTrainerScreen extends StatefulWidget {
+  const ConversationTrainerScreen({super.key});
+  @override
+  State<ConversationTrainerScreen> createState() =>
+      _ConversationTrainerScreenState();
+}
+
+class _ConversationTrainerScreenState
+    extends State<ConversationTrainerScreen> {
+  final _scenarioController = TextEditingController();
+  final _replyController = TextEditingController();
+  final _scroll = ScrollController();
+  final List<ChatMessage> _messages = [];
+  bool _training = false;
+  bool _loading = false;
+
+  void _startTraining() {
+    final scenario = _scenarioController.text.trim();
+    if (scenario.isEmpty) return;
+
+    setState(() {
+      _training = true;
+      _messages.clear();
+      _messages.add(ChatMessage(
+          role: 'assistant',
+          content:
+              '🎭 Начинаем. Ситуация: $scenario\n\nЯ — твой собеседник. Начинай разговор первым. Если захочешь остановиться и получить разбор — напиши «СТОП».'));
+    });
+  }
+
+  Future<void> _send() async {
+    final text = _replyController.text.trim();
+    if (text.isEmpty || _loading) return;
+
+    if (AppState.apiKey.isEmpty) {
+      setState(() {
+        _messages.add(ChatMessage(role: 'user', content: text));
+        _messages.add(ChatMessage(
+            role: 'assistant',
+            content: '⚠ Ключ Groq не введён.'));
+      });
+      _replyController.clear();
+      _scrollDown();
+      return;
     }
 
+    setState(() {
+      _messages.add(ChatMessage(role: 'user', content: text));
+      _loading = true;
+    });
+    _replyController.clear();
+    _scrollDown();
+
+    final trainerPrompt = '''
+Ты — тренажёр сложных разговоров. Пользователь описал ситуацию: "${_scenarioController.text.trim()}".
+
+Ты играешь роль собеседника из этой ситуации. Будь реалистичен: можешь давить, манипулировать. Отвечай коротко — 2-3 предложения. По-русски. Если пользователь пишет «СТОП» — дай полный разбор. Используй эмодзи.
+''';
+
+    try {
+      final ai = AiService(apiKey: AppState.apiKey, prompt: trainerPrompt);
+      final reply = await ai.chat(_messages);
+      setState(() {
+        _messages.add(ChatMessage(role: 'assistant', content: reply));
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _messages
+            .add(ChatMessage(role: 'assistant', content: 'Ошибка: $e'));
+        _loading = false;
+      });
+    }
+    _scrollDown();
+  }
+
+  void _scrollDown() {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_scroll.hasClients) {
+        _scroll.animateTo(_scroll.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.primary,
+        elevation: 0,
+        title: const Text("💬  Тренажёр разговоров",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          if (_training)
+            IconButton(
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              onPressed: () => setState(() {
+                _training = false;
+                _messages.clear();
+                _scenarioController.clear();
+              }),
+            ),
+        ],
+      ),
+      body: SafeArea(
+        child: _training ? _chatView() : _setupView(),
+      ),
+    );
+  }
+
+  Widget _setupView() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Center(
-            child: Container(
-              width: 110,
-              height: 110,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white,
-                border: Border.all(color: AppColors.mint, width: 4),
-              ),
-              child: Center(
-                child: Text(AppState.avatar.isEmpty ? "🌸" : AppState.avatar,
-                    style: const TextStyle(fontSize: 60)),
-              ),
-            ),
+          const Text("Опиши ситуацию, к которой хочешь подготовиться",
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.text)),
+          const SizedBox(height: 5),
+          const Text(
+            "Например: «Хочу попросить повышение у босса», «Хочу сказать маме о своих границах», «Хочу отказать подруге»",
+            style: TextStyle(fontSize: 13, color: AppColors.primaryDark),
           ),
-          const SizedBox(height: 15),
-          Center(
-            child: Text(AppState.userName.isEmpty ? "Друг" : AppState.userName,
-                style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.text)),
-          ),
-          Center(
-            child: Text(
-                AppState.age.isEmpty ? "Возраст не указан" : "${AppState.age} лет",
-                style: const TextStyle(
-                    fontSize: 14, color: AppColors.primaryDark)),
-          ),
-          const SizedBox(height: 25),
+          const SizedBox(height: 20),
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
             ),
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                const Text("📊  Прогресс",
-                    style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.text)),
-                const SizedBox(height: 15),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _stat(AppState.moods.length.toString(), "Отметок",
-                        AppColors.purpleDeep),
-                    _stat(AppState.entries.length.toString(), "Записей",
-                        AppColors.purpleLight),
-                    _stat(days.toString(), "Дней", AppColors.purpleMedium),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 15),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.pastelMint,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(25)),
-              minimumSize: const Size.fromHeight(50),
-            ),
-            onPressed: () => MainWindow.of(context)
-                ?.setCustomScreen(const EmotionMapScreen()),
-            child: const Text("🎨  Карта эмоций",
-                style: TextStyle(
-                    color: AppColors.text,
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold)),
-          ),
-          const SizedBox(height: 10),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.pastelBlue,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(25)),
-              minimumSize: const Size.fromHeight(50),
-            ),
-            onPressed: () => MainWindow.of(context)
-                ?.setCustomScreen(const LinksScreen()),
-            child: const Text("🔗  Полезные ссылки",
-                style: TextStyle(
-                    color: AppColors.text,
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold)),
-          ),
-          const SizedBox(height: 15),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.pastelGreen,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            padding: const EdgeInsets.all(15),
-            child: const Row(
-              children: [
-                Text("🔒", style: TextStyle(fontSize: 22)),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    "Все данные хранятся только у тебя на устройстве.",
-                    style: TextStyle(fontSize: 12, color: AppColors.text),
-                  ),
-                ),
-              ],
+            padding: const EdgeInsets.all(14),
+            child: TextField(
+              controller: _scenarioController,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                hintText: "Ситуация...",
+                hintStyle: TextStyle(color: Colors.grey),
+              ),
+              style: const TextStyle(fontSize: 14),
             ),
           ),
           const SizedBox(height: 20),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.pastelPink,
+              backgroundColor: AppColors.purpleDeep,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(22)),
-              minimumSize: const Size.fromHeight(45),
+              minimumSize: const Size.fromHeight(52),
             ),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text("Сброс данных"),
-                  content: const Text("Точно удалить ВСЕ данные?"),
-                  actions: [
-                    TextButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text("Нет")),
-                    TextButton(
-                      onPressed: () {
-                        AppState.clear();
-                        Navigator.pop(ctx);
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(builder: (_) => const PsyApp()),
-                          (r) => false,
-                        );
-                      },
-                      child: const Text("Да"),
-                    ),
-                  ],
-                ),
-              );
-            },
-            child: const Text("🗑  Сбросить все данные",
+            onPressed: _startTraining,
+            child: const Text("🎭  Начать тренировку",
                 style: TextStyle(
-                    color: AppColors.text,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold)),
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15)),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.pastelBlue,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            padding: const EdgeInsets.all(14),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("💡 Это безопасное пространство.",
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.text)),
+                SizedBox(height: 4),
+                Text(
+                    "ИИ играет роль собеседника. Он может быть неудобным — но это тренировка. Здесь можно ошибиться.",
+                    style: TextStyle(fontSize: 12, color: AppColors.text)),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _stat(String c, String l, Color color) {
+  Widget _chatView() {
     return Column(
       children: [
-        Text(c,
-            style: TextStyle(
-                fontSize: 28, fontWeight: FontWeight.bold, color: color)),
-        Text(l,
-            style:
-                const TextStyle(fontSize: 12, color: AppColors.primaryDark)),
+        Expanded(
+          child: ListView.builder(
+            controller: _scroll,
+            padding: const EdgeInsets.all(16),
+            itemCount: _messages.length,
+            itemBuilder: (context, i) {
+              final m = _messages[i];
+              final isUser = m.role == 'user';
+              return Align(
+                alignment:
+                    isUser ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(14),
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.78,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isUser ? AppColors.purpleDeep : Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(16),
+                      topRight: const Radius.circular(16),
+                      bottomLeft: Radius.circular(isUser ? 16 : 4),
+                      bottomRight: Radius.circular(isUser ? 4 : 16),
+                    ),
+                  ),
+                  child: Text(
+                    m.content,
+                    style: TextStyle(
+                      fontSize: 15,
+                      height: 1.4,
+                      color: isUser ? Colors.white : AppColors.text,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        if (_loading)
+          const Padding(
+            padding: EdgeInsets.all(8),
+            child: Text('печатает...',
+                style: TextStyle(
+                    fontStyle: FontStyle.italic,
+                    color: AppColors.primaryDark)),
+          ),
+        Container(
+          padding: const EdgeInsets.all(12),
+          color: Colors.white,
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.background.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: TextField(
+                    controller: _replyController,
+                    maxLines: null,
+                    decoration: const InputDecoration(
+                      hintText: 'Твой ответ...',
+                      border: InputBorder.none,
+                    ),
+                    onSubmitted: (_) => _send(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                decoration: const BoxDecoration(
+                  color: AppColors.purpleDeep,
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.send, color: Colors.white),
+                  onPressed: _loading ? null : _send,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
 }
-
 // ==========================================
-// 🎨 EMOTION MAP SCREEN
+// 🎨 EMOTION MAP SCREEN — календарь эмоций
 // ==========================================
 class EmotionMapScreen extends StatefulWidget {
   const EmotionMapScreen({super.key});
@@ -2440,8 +3748,10 @@ class _EmotionMapScreenState extends State<EmotionMapScreen> {
       cells.add(
         Container(
           margin: const EdgeInsets.all(2),
-          decoration:
-              BoxDecoration(color: color, shape: BoxShape.circle),
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
           child: Stack(
             alignment: Alignment.center,
             children: [
@@ -2477,7 +3787,7 @@ class _EmotionMapScreenState extends State<EmotionMapScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
-        title: const Text("🎨  Карта эмоций",
+        title: const Text("🎨  Календарь эмоций",
             style: TextStyle(
                 color: AppColors.text, fontWeight: FontWeight.bold)),
         iconTheme: const IconThemeData(color: AppColors.text),
@@ -2494,12 +3804,10 @@ class _EmotionMapScreenState extends State<EmotionMapScreen> {
                   IconButton(
                     icon: const Icon(Icons.arrow_back),
                     onPressed: () => setState(() {
-                      _month =
-                          DateTime(_month.year, _month.month - 1, 1);
+                      _month = DateTime(_month.year, _month.month - 1, 1);
                     }),
                   ),
-                  Text(
-                      "${_monthNames[_month.month - 1]} ${_month.year}",
+                  Text("${_monthNames[_month.month - 1]} ${_month.year}",
                       style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -2507,8 +3815,7 @@ class _EmotionMapScreenState extends State<EmotionMapScreen> {
                   IconButton(
                     icon: const Icon(Icons.arrow_forward),
                     onPressed: () {
-                      final nxt =
-                          DateTime(_month.year, _month.month + 1, 1);
+                      final nxt = DateTime(_month.year, _month.month + 1, 1);
                       if (!nxt.isAfter(DateTime.now())) {
                         setState(() => _month = nxt);
                       }
@@ -2566,6 +3873,192 @@ class _EmotionMapScreenState extends State<EmotionMapScreen> {
     );
   }
 }
+// ==========================================
+// 🔥 HEAT MAP SCREEN
+// ==========================================
+class HeatMapScreen extends StatelessWidget {
+  const HeatMapScreen({super.key});
+
+  Color _colorForCount(int count) {
+    if (count == 0) return const Color(0xFFE0E0E0);
+    if (count == 1) return const Color(0xFFD0F4DE);
+    if (count == 2) return const Color(0xFFA8E6CF);
+    if (count == 3) return const Color(0xFF82E0AA);
+    if (count <= 5) return const Color(0xFF52BE80);
+    return const Color(0xFF2E7D32);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    final Map<String, int> counts = {};
+    for (final m in AppState.moods) {
+      final key = "${m.date.year}-${m.date.month}-${m.date.day}";
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    for (final e in AppState.entries) {
+      final key = "${e.date.year}-${e.date.month}-${e.date.day}";
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+
+    final days = <DateTime>[];
+    for (int i = 139; i >= 0; i--) {
+      days.add(today.subtract(Duration(days: i)));
+    }
+
+    final weeks = <List<DateTime>>[];
+    for (int i = 0; i < days.length; i += 7) {
+      weeks.add(days.sublist(i, i + 7 > days.length ? days.length : i + 7));
+    }
+
+    final totalMarks = counts.values.fold<int>(0, (a, b) => a + b);
+    final activeDays = counts.length;
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        title: const Text("🔥  Тепловая карта",
+            style: TextStyle(
+                color: AppColors.text, fontWeight: FontWeight.bold)),
+        iconTheme: const IconThemeData(color: AppColors.text),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text("Активность за последние 20 недель",
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.text)),
+              const SizedBox(height: 5),
+              const Text(
+                "Каждая клетка — день. Чем темнее, тем больше отметок.",
+                style: TextStyle(fontSize: 13, color: AppColors.primaryDark),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                padding: const EdgeInsets.all(14),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: weeks.map((week) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: Column(
+                          children: week.map((day) {
+                            final key =
+                                "${day.year}-${day.month}-${day.day}";
+                            final count = counts[key] ?? 0;
+                            return Container(
+                              width: 14,
+                              height: 14,
+                              margin: const EdgeInsets.only(bottom: 4),
+                              decoration: BoxDecoration(
+                                color: _colorForCount(count),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  const Text("Меньше",
+                      style: TextStyle(
+                          fontSize: 11, color: AppColors.primaryDark)),
+                  const SizedBox(width: 8),
+                  ...[0, 1, 2, 3, 5, 7].map((c) => Container(
+                        width: 14,
+                        height: 14,
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        decoration: BoxDecoration(
+                          color: _colorForCount(c),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      )),
+                  const SizedBox(width: 8),
+                  const Text("Больше",
+                      style: TextStyle(
+                          fontSize: 11, color: AppColors.primaryDark)),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.pastelYellow,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("📊  Твоя статистика",
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.text)),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _stat(totalMarks.toString(), "Отметок",
+                            AppColors.purpleDeep),
+                        _stat(activeDays.toString(), "Активных дней",
+                            AppColors.purpleMedium),
+                        _stat(
+                            "${(activeDays / 140 * 100).toStringAsFixed(0)}%",
+                            "Регулярность",
+                            AppColors.purpleLight),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                "💜 Ты строишь путь. Каждая клетка — день, когда ты заботился(ась) о себе.",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                    color: AppColors.primaryDark),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _stat(String c, String l, Color color) {
+    return Column(
+      children: [
+        Text(c,
+            style: TextStyle(
+                fontSize: 22, fontWeight: FontWeight.bold, color: color)),
+        Text(l,
+            style: const TextStyle(fontSize: 11, color: AppColors.primaryDark)),
+      ],
+    );
+  }
+}
 
 // ==========================================
 // 🔗 LINKS SCREEN
@@ -2612,7 +4105,8 @@ class LinksScreen extends StatelessWidget {
                   () => _notice(context, "insighttimer.com")),
               _link("📚", "Книги по психологии",
                   "Бесплатные книги и статьи",
-                  AppColors.pastelYellow, () => _notice(context, "bookscafe.net")),
+                  AppColors.pastelYellow,
+                  () => _notice(context, "bookscafe.net")),
               _link("💬", "pomogut.by",
                   "Помощь подросткам и молодёжи",
                   AppColors.pastelBlue, () => _notice(context, "pomogut.by")),
