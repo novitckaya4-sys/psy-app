@@ -3,29 +3,29 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:vibration/vibration.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // ==========================================
-// 🎨 ЦВЕТА
+// 🎨 ЦВЕТА — мягкие, светлые, приятные
 // ==========================================
 class AppColors {
-  static const Color primary = Color(0xFF3C096C);
-  static const Color primaryDark = Color(0xFF5A189A);
-  static const Color background = Color(0xFFE0AAFF);
+  static const Color primary = Color(0xFF5B21B6);
+  static const Color primaryDark = Color(0xFF7C3AED);
+  static const Color background = Color(0xFFF3E5FF);
   static const Color card = Color(0xFFFFFFFF);
-  static const Color text = Color(0xFF240046);
-  static const Color danger = Color(0xFFE74C3C);
-  static const Color mint = Color(0xFFA8E6CF);
+  static const Color text = Color(0xFF3B0764);
+  static const Color danger = Color(0xFFEF4444);
+  static const Color mint = Color(0xFFB7E4C7);
 
-  static const Color pastelYellow = Color(0xFFFCF6BD);
-  static const Color pastelGreen = Color(0xFFB8E6D5);
-  static const Color pastelPink = Color(0xFFFFB6C1);
-  static const Color pastelMint = Color(0xFFD0F4DE);
-  static const Color pastelBlue = Color(0xFFC4E4FF);
-  static const Color pastelPeach = Color(0xFFFFDAB9);
-  static const Color purpleLight = Color(0xFFC77DFF);
-  static const Color purpleMedium = Color(0xFF9D4EDD);
-  static const Color purpleDeep = Color(0xFF7B2CBF);
+  static const Color pastelYellow = Color(0xFFFEF9C3);
+  static const Color pastelGreen = Color(0xFFD1FAE5);
+  static const Color pastelPink = Color(0xFFFBCFE8);
+  static const Color pastelMint = Color(0xFFE0F2E9);
+  static const Color pastelBlue = Color(0xFFDBEAFE);
+  static const Color pastelPeach = Color(0xFFFED7AA);
+  static const Color purpleLight = Color(0xFFC084FC);
+  static const Color purpleMedium = Color(0xFFA855F7);
+  static const Color purpleDeep = Color(0xFF9333EA);
 }
 
 // ==========================================
@@ -113,7 +113,7 @@ class AiService {
   final String apiKey;
   final String systemPrompt;
   static const String baseUrl = 'https://api.groq.com/openai/v1';
-static const String model = 'openai/gpt-oss-120b';
+  static const String model = 'openai/gpt-oss-120b';
 
   AiService({required this.apiKey, String? prompt})
       : systemPrompt = prompt ?? defaultPrompt;
@@ -198,14 +198,12 @@ final List<CrisisProtocol> crisisProtocols = [
     emoji: "🖤",
     title: "Суицидальные мысли",
     subtitle: "Когда кажется, что выхода нет",
-    color: const Color(0xFF8E7CC3),
+    color: const Color(0xFFC4B5FD),
     steps: [
       {
         "t": "1. Останови мгновение",
-        "d":
-            "Мысли о смерти — это не желание умереть. Это желание, чтобы боль закончилась.",
-        "a":
-            "Скажи вслух: «Я хочу не умереть. Я хочу, чтобы перестало болеть.»"
+        "d": "Мысли о смерти — это не желание умереть. Это желание, чтобы боль закончилась.",
+        "a": "Скажи вслух: «Я хочу не умереть. Я хочу, чтобы перестало болеть.»"
       },
       {
         "t": "2. Ты в безопасности?",
@@ -239,7 +237,7 @@ final List<CrisisProtocol> crisisProtocols = [
     emoji: "💓",
     title: "Паническая атака",
     subtitle: "Сердце колотится, не хватает воздуха",
-    color: const Color(0xFFFFB6C1),
+    color: const Color(0xFFFBCFE8),
     steps: [
       {
         "t": "1. Ты не умираешь",
@@ -273,7 +271,7 @@ final List<CrisisProtocol> crisisProtocols = [
     emoji: "🌙",
     title: "Бессонница",
     subtitle: "Не могу уснуть",
-    color: const Color(0xFFC4E4FF),
+    color: const Color(0xFFDBEAFE),
     steps: [
       {
         "t": "1. Правило 20 минут",
@@ -307,7 +305,7 @@ final List<CrisisProtocol> crisisProtocols = [
     emoji: "🌊",
     title: "Сильная тревога",
     subtitle: "Внутри всё сжимается",
-    color: const Color(0xFFFFDAB9),
+    color: const Color(0xFFFED7AA),
     steps: [
       {
         "t": "1. Назови тревогу",
@@ -338,7 +336,7 @@ final List<CrisisProtocol> crisisProtocols = [
     emoji: "🔥",
     title: "Гнев / агрессия",
     subtitle: "Хочется кричать",
-    color: const Color(0xFFFFB6B6),
+    color: const Color(0xFFFECACA),
     steps: [
       {
         "t": "1. Выйди из ситуации",
@@ -361,7 +359,7 @@ final List<CrisisProtocol> crisisProtocols = [
     emoji: "🩹",
     title: "Тяга к самоповреждению",
     subtitle: "Хочется порезать себя",
-    color: const Color(0xFFE8B4D8),
+    color: const Color(0xFFE9D5FF),
     steps: [
       {"t": "1. Отложи на 15 минут", "d": "Импульс длится недолго.", "a": "Поставь таймер."},
       {"t": "2. Убери предметы", "d": "Сделай импульс недоступным."},
@@ -388,7 +386,7 @@ final List<CrisisProtocol> crisisProtocols = [
     emoji: "💧",
     title: "Истерика / слёзы",
     subtitle: "Не могу остановиться",
-    color: const Color(0xFFA9DEF9),
+    color: const Color(0xFFBFDBFE),
     steps: [
       {"t": "1. Позволь плакать", "d": "Слёзы лечат.", "a": "«Я имею право плакать.»"},
       {"t": "2. Безопасное место", "d": "Сядь. Укройся пледом."},
@@ -403,7 +401,7 @@ final List<CrisisProtocol> crisisProtocols = [
     emoji: "🌫",
     title: "Диссоциация",
     subtitle: "Всё как в тумане",
-    color: const Color(0xFFD0F4DE),
+    color: const Color(0xFFE0F2E9),
     steps: [
       {"t": "1. Это защита", "d": "Мозг отключил чувства, чтобы выжить."},
       {
@@ -444,35 +442,35 @@ final List<RoleCharacter> roleCharacters = [
   RoleCharacter(
     emoji: "🏛",
     name: "Сократ",
-    color: const Color(0xFFC4E4FF),
+    color: const Color(0xFFDBEAFE),
     prompt:
         'Ты — Сократ. Задаёшь глубокие вопросы, не даёшь готовых ответов. Помогаешь человеку самому прийти к истине через диалог. Говори мудро, но просто, по-русски. Задавай по одному вопросу.',
   ),
   RoleCharacter(
     emoji: "👵",
     name: "Строгая бабушка",
-    color: const Color(0xFFFFDAB9),
+    color: const Color(0xFFFED7AA),
     prompt:
         'Ты — строгая, но любящая бабушка. Говоришь прямо, без сюсюканья. Можешь сказать «не ной», но всегда с любовью. Даёшь жизненные советы из опыта.',
   ),
   RoleCharacter(
     emoji: "💪",
     name: "Тренер",
-    color: const Color(0xFFB8E6D5),
+    color: const Color(0xFFD1FAE5),
     prompt:
         'Ты — жёсткий, но справедливый тренер. Мотивируешь, не даёшь себя жалеть. Говоришь короткими фразами. Спрашиваешь: «Что ты можешь сделать прямо сейчас?»',
   ),
   RoleCharacter(
     emoji: "🧒",
     name: "Внутренний ребёнок",
-    color: const Color(0xFFFFB6C1),
+    color: const Color(0xFFFBCFE8),
     prompt:
         'Ты — внутренний ребёнок человека. Говоришь наивно, искренне, напрямую. Можешь сказать «я боюсь», «мне больно», «я хочу чтобы меня обняли». Помогаешь взрослому услышать свои настоящие чувства.',
   ),
   RoleCharacter(
     emoji: "🔮",
     name: "Будущий ты",
-    color: const Color(0xFFC77DFF),
+    color: const Color(0xFFE9D5FF),
     prompt:
         'Ты — этот же человек, но через 10 лет. Ты уже прошёл через то, что сейчас у него. Говоришь с теплом и мудростью. Спрашиваешь: «Ты правда этого хочешь или отмазываешься?» Даёшь советы из будущего.',
   ),
@@ -506,7 +504,7 @@ class PsyApp extends StatelessWidget {
 }
 
 // ==========================================
-// 🧭 КОРНЕВОЙ ЭКРАН
+// 🧭 КОРНЕВОЙ ЭКРАН — с сохранением регистрации
 // ==========================================
 class RootScreen extends StatefulWidget {
   const RootScreen({super.key});
@@ -515,15 +513,56 @@ class RootScreen extends StatefulWidget {
 }
 
 class _RootScreenState extends State<RootScreen> {
-  bool _registered = false;
+  bool? _registered;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUser();
+  }
+
+  Future<void> _loadUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedName = prefs.getString('userName') ?? '';
+    if (savedName.isNotEmpty) {
+      AppState.userName = savedName;
+      AppState.age = prefs.getString('age') ?? '';
+      AppState.avatar = prefs.getString('avatar') ?? '🌸';
+      AppState.apiKey = prefs.getString('apiKey') ?? '';
+      setState(() => _registered = true);
+    } else {
+      setState(() => _registered = false);
+    }
+  }
+
+  Future<void> _saveUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('userName', AppState.userName);
+    await prefs.setString('age', AppState.age);
+    await prefs.setString('avatar', AppState.avatar);
+    await prefs.setString('apiKey', AppState.apiKey);
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (!_registered) {
-      return RegistrationScreen(
-        onDone: () => setState(() => _registered = true),
+    if (_registered == null) {
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: Text("🌸", style: TextStyle(fontSize: 80)),
+        ),
       );
     }
+
+    if (_registered == false) {
+      return RegistrationScreen(
+        onDone: () async {
+          await _saveUser();
+          setState(() => _registered = true);
+        },
+      );
+    }
+
     return const MainWindow();
   }
 }
@@ -545,15 +584,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   String _selectedAvatar = "";
 
   final List<Map<String, dynamic>> _row1 = [
-    {"emoji": "🌸", "color": const Color(0xFFFFB6C1)},
-    {"emoji": "🌿", "color": const Color(0xFFB8E6D5)},
-    {"emoji": "⭐", "color": const Color(0xFFFCF6BD)},
-    {"emoji": "🌙", "color": const Color(0xFFC4E4FF)},
+    {"emoji": "🌸", "color": const Color(0xFFFBCFE8)},
+    {"emoji": "🌿", "color": const Color(0xFFD1FAE5)},
+    {"emoji": "⭐", "color": const Color(0xFFFEF9C3)},
+    {"emoji": "🌙", "color": const Color(0xFFDBEAFE)},
   ];
   final List<Map<String, dynamic>> _row2 = [
-    {"emoji": "🔥", "color": const Color(0xFFFFB6B6)},
-    {"emoji": "💧", "color": const Color(0xFFB6D9FF)},
-    {"emoji": "🌺", "color": const Color(0xFFFFC4E0)},
+    {"emoji": "🔥", "color": const Color(0xFFFECACA)},
+    {"emoji": "💧", "color": const Color(0xFFBFDBFE)},
+    {"emoji": "🌺", "color": const Color(0xFFFBCFE8)},
   ];
 
   bool get _active =>
@@ -895,14 +934,14 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Container(
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFFE74C3C), Color(0xFFC0392B)],
+                  colors: [Color(0xFFF87171), Color(0xFFEF4444)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.danger.withValues(alpha: 0.35),
+                    color: AppColors.danger.withValues(alpha: 0.3),
                     blurRadius: 14,
                     offset: const Offset(0, 6),
                   ),
@@ -925,7 +964,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 14),
 
-          // Ряд 1: ИИ + Что делать
+          // Ряд 1
           Row(
             children: [
               Expanded(
@@ -951,7 +990,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 14),
 
-          // Ряд 2: Роли + Тренажёр
+          // Ряд 2
           Row(
             children: [
               Expanded(
@@ -1076,51 +1115,50 @@ class _HomeScreenState extends State<HomeScreen> {
                     fontSize: 15,
                     fontWeight: FontWeight.bold)),
           ),
-                 const SizedBox(height: 18),
+          const SizedBox(height: 18),
 
-        // 🎨 Календарь эмоций — новый блок
-        GestureDetector(
-          onTap: () => MainWindow.of(context)
-              ?.setCustomScreen(const EmotionMapScreen()),
-          child: Container(
-            decoration: BoxDecoration(
-              color: AppColors.pastelMint,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                const Text("🎨", style: TextStyle(fontSize: 26)),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Календарь эмоций",
-                          style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.text)),
-                      Text("Посмотри прошлые дни",
-                          style: TextStyle(
-                              fontSize: 12, color: AppColors.primaryDark)),
-                    ],
+          // 🎨 Календарь эмоций
+          GestureDetector(
+            onTap: () => MainWindow.of(context)
+                ?.setCustomScreen(const EmotionMapScreen()),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.pastelMint,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Text("🎨", style: TextStyle(fontSize: 26)),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Календарь эмоций",
+                            style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.text)),
+                        Text("Посмотри прошлые дни",
+                            style: TextStyle(
+                                fontSize: 12, color: AppColors.primaryDark)),
+                      ],
+                    ),
                   ),
-                ),
-                const Icon(Icons.arrow_forward_ios_rounded,
-                    size: 16, color: AppColors.text),
-              ],
+                  const Icon(Icons.arrow_forward_ios_rounded,
+                      size: 16, color: AppColors.text),
+                ],
+              ),
             ),
           ),
-        ),
-
-        const SizedBox(height: 25),
+          const SizedBox(height: 25),
 
           // Совет дня
           Container(
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFFFB6D9), Color(0xFFFFC4E0)],
+                colors: [Color(0xFFFBCFE8), Color(0xFFFCE7F3)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -1656,7 +1694,7 @@ class _MeditationScreenState extends State<MeditationScreen> {
                       decoration: const BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: LinearGradient(
-                          colors: [AppColors.pastelMint, Color(0xFFB8E6D5)],
+                          colors: [AppColors.pastelMint, Color(0xFFD1FAE5)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
@@ -2037,7 +2075,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
+                          color: Colors.black.withValues(alpha: 0.04),
                           blurRadius: 8,
                           offset: const Offset(0, 3),
                         ),
@@ -2173,10 +2211,10 @@ class ProfileScreen extends StatelessWidget {
               Expanded(
                 child: _bigButton(
                   emoji: "🎨",
-                  title: "Карта эмоций",
+                  title: "Календарь эмоций",
                   color: AppColors.pastelMint,
                   onTap: () => MainWindow.of(context)
-                      ?.setCustomScreen(const HeatMapScreen()),
+                      ?.setCustomScreen(const EmotionMapScreen()),
                 ),
               ),
               const SizedBox(width: 12),
@@ -2232,15 +2270,19 @@ class ProfileScreen extends StatelessWidget {
                         onPressed: () => Navigator.pop(ctx),
                         child: const Text("Нет")),
                     TextButton(
-                      onPressed: () {
-                        AppState.clear();
-                        Navigator.pop(ctx);
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(builder: (_) => const PsyApp()),
-                          (r) => false,
-                        );
-                      },
+                      onPressed: () async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.clear();
+  AppState.clear();
+  if (ctx.mounted) Navigator.pop(ctx);
+  if (context.mounted) {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const PsyApp()),
+      (r) => false,
+    );
+  }
+},
                       child: const Text("Да"),
                     ),
                   ],
@@ -2326,16 +2368,6 @@ class _SosAnchorScreenState extends State<SosAnchorScreen> {
       _phaseText = "Вдох...";
     });
     _tick();
-    _vibrate();
-  }
-
-  void _vibrate() async {
-    try {
-      final hasVib = await Vibration.hasVibrator();
-      if (hasVib == true) {
-        Vibration.vibrate(duration: 200);
-      }
-    } catch (_) {}
   }
 
   void _tick() {
@@ -2343,7 +2375,6 @@ class _SosAnchorScreenState extends State<SosAnchorScreen> {
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       setState(() => _secondsLeft--);
       if (_secondsLeft <= 0) {
-        _vibrate();
         if (_phase == 0) {
           setState(() {
             _phase = 1;
@@ -2376,9 +2407,9 @@ class _SosAnchorScreenState extends State<SosAnchorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFFE5E5),
+      backgroundColor: const Color(0xFFFFF1F1),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFFFE5E5),
+        backgroundColor: const Color(0xFFFFF1F1),
         elevation: 0,
         title: const Text("🆘  Якорь",
             style: TextStyle(
@@ -2401,7 +2432,7 @@ class _SosAnchorScreenState extends State<SosAnchorScreen> {
               const SizedBox(height: 8),
               const Center(
                 child: Text(
-                  "Нажми «Начать» и дыши с нами.\nТелефон будет тихонько вибрировать в ритм.",
+                  "Нажми «Начать» и дыши с нами.",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                       fontSize: 13, color: AppColors.primaryDark),
@@ -2678,7 +2709,7 @@ class ProtocolDetailScreen extends StatelessWidget {
                         const SizedBox(height: 10),
                         Container(
                           decoration: BoxDecoration(
-                            color: protocol.color.withValues(alpha: 0.3),
+                            color: protocol.color.withValues(alpha: 0.5),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           padding: const EdgeInsets.all(12),
@@ -2755,7 +2786,7 @@ class _AiTherapistScreenState extends State<AiTherapistScreen> {
         _messages.add(ChatMessage(
             role: 'assistant',
             content:
-                'Извини, ключ Groq не введён.\n\nЗакрой приложение и введи ключ при регистрации, или сбрось данные в профиле и заново введи.'));
+                'Извини, ключ Groq не введён.\n\nСбрось данные в профиле и введи ключ заново.'));
       });
       _controller.clear();
       _scrollDown();
@@ -3189,6 +3220,7 @@ class _RolePlayScreenState extends State<RolePlayScreen> {
     );
   }
 }
+
 // ==========================================
 // 🕵️ DISTORTION DETECTOR SCREEN
 // ==========================================
@@ -3665,214 +3697,7 @@ class _ConversationTrainerScreenState
     );
   }
 }
-// ==========================================
-// 🎨 EMOTION MAP SCREEN — календарь эмоций
-// ==========================================
-class EmotionMapScreen extends StatefulWidget {
-  const EmotionMapScreen({super.key});
-  @override
-  State<EmotionMapScreen> createState() => _EmotionMapScreenState();
-}
 
-class _EmotionMapScreenState extends State<EmotionMapScreen> {
-  DateTime _month = DateTime(DateTime.now().year, DateTime.now().month, 1);
-
-  final List<String> _monthNames = [
-    "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
-    "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final firstDay = DateTime(_month.year, _month.month, 1);
-    final nextMonth = DateTime(_month.year, _month.month + 1, 1);
-    final daysInMonth = nextMonth.subtract(const Duration(days: 1)).day;
-    final startOffset = (firstDay.weekday - 1) % 7;
-
-    int totalMarks = 0;
-    final moodCounts = <String, int>{};
-    final cells = <Widget>[];
-
-    for (int i = 0; i < startOffset; i++) {
-      cells.add(const SizedBox(width: 44, height: 44));
-    }
-
-    for (int day = 1; day <= daysInMonth; day++) {
-      final date = DateTime(_month.year, _month.month, day);
-      final match = AppState.moods.where((m) =>
-          m.date.year == date.year &&
-          m.date.month == date.month &&
-          m.date.day == date.day);
-
-      Color color = const Color(0xFFF0F0F0);
-      String emoji = "";
-
-      if (date.isAfter(DateTime.now())) {
-        color = const Color(0xFFFAFAFA);
-      } else if (match.isNotEmpty) {
-        final m = match.first.mood;
-        totalMarks++;
-        moodCounts[m] = (moodCounts[m] ?? 0) + 1;
-        switch (m) {
-          case "Злость":
-            color = const Color(0xFFE74C3C);
-            emoji = "😡";
-            break;
-          case "Грусть":
-            color = const Color(0xFF5DADE2);
-            emoji = "😢";
-            break;
-          case "Тревога":
-            color = const Color(0xFFF5B041);
-            emoji = "😰";
-            break;
-          case "Апатия":
-            color = const Color(0xFFAAB7B8);
-            emoji = "😐";
-            break;
-          case "Нейтрально":
-            color = const Color(0xFFF7DC6F);
-            emoji = "🙂";
-            break;
-          case "Радость":
-            color = const Color(0xFF82E0AA);
-            emoji = "😊";
-            break;
-          case "Счастье":
-            color = const Color(0xFFF1948A);
-            emoji = "😍";
-            break;
-        }
-      }
-
-      cells.add(
-        Container(
-          margin: const EdgeInsets.all(2),
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Positioned(
-                top: 3,
-                child: Text("$day",
-                    style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.text)),
-              ),
-              if (emoji.isNotEmpty)
-                Positioned(
-                  bottom: 2,
-                  child: Text(emoji, style: const TextStyle(fontSize: 14)),
-                ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    String summary = "За ${_monthNames[_month.month - 1]} нет отметок.";
-    if (totalMarks > 0) {
-      final top = moodCounts.entries.toList()
-        ..sort((a, b) => b.value.compareTo(a.value));
-      summary =
-          "За ${_monthNames[_month.month - 1]} ты отмечал(а) настроение $totalMarks раз.\nЧаще всего — «${top.first.key}» (${top.first.value} раз).\n💜";
-    }
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        title: const Text("🎨  Календарь эмоций",
-            style: TextStyle(
-                color: AppColors.text, fontWeight: FontWeight.bold)),
-        iconTheme: const IconThemeData(color: AppColors.text),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back),
-                    onPressed: () => setState(() {
-                      _month = DateTime(_month.year, _month.month - 1, 1);
-                    }),
-                  ),
-                  Text("${_monthNames[_month.month - 1]} ${_month.year}",
-                      style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.text)),
-                  IconButton(
-                    icon: const Icon(Icons.arrow_forward),
-                    onPressed: () {
-                      final nxt = DateTime(_month.year, _month.month + 1, 1);
-                      if (!nxt.isAfter(DateTime.now())) {
-                        setState(() => _month = nxt);
-                      }
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                padding: const EdgeInsets.all(15),
-                child: Column(
-                  children: [
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        Text("Пн", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
-                        Text("Вт", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
-                        Text("Ср", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
-                        Text("Чт", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
-                        Text("Пт", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
-                        Text("Сб", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
-                        Text("Вс", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    GridView.count(
-                      crossAxisCount: 7,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      children: cells,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.pastelYellow,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                padding: const EdgeInsets.all(15),
-                child: Text(summary,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        fontSize: 14, color: AppColors.text)),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 // ==========================================
 // 🔥 HEAT MAP SCREEN
 // ==========================================
@@ -3880,12 +3705,12 @@ class HeatMapScreen extends StatelessWidget {
   const HeatMapScreen({super.key});
 
   Color _colorForCount(int count) {
-    if (count == 0) return const Color(0xFFE0E0E0);
-    if (count == 1) return const Color(0xFFD0F4DE);
-    if (count == 2) return const Color(0xFFA8E6CF);
-    if (count == 3) return const Color(0xFF82E0AA);
-    if (count <= 5) return const Color(0xFF52BE80);
-    return const Color(0xFF2E7D32);
+    if (count == 0) return const Color(0xFFE5E7EB);
+    if (count == 1) return const Color(0xFFD1FAE5);
+    if (count == 2) return const Color(0xFFA7F3D0);
+    if (count == 3) return const Color(0xFF6EE7B7);
+    if (count <= 5) return const Color(0xFF34D399);
+    return const Color(0xFF059669);
   }
 
   @override
@@ -4056,6 +3881,215 @@ class HeatMapScreen extends StatelessWidget {
         Text(l,
             style: const TextStyle(fontSize: 11, color: AppColors.primaryDark)),
       ],
+    );
+  }
+}
+
+// ==========================================
+// 🎨 EMOTION MAP SCREEN — календарь эмоций
+// ==========================================
+class EmotionMapScreen extends StatefulWidget {
+  const EmotionMapScreen({super.key});
+  @override
+  State<EmotionMapScreen> createState() => _EmotionMapScreenState();
+}
+
+class _EmotionMapScreenState extends State<EmotionMapScreen> {
+  DateTime _month = DateTime(DateTime.now().year, DateTime.now().month, 1);
+
+  final List<String> _monthNames = [
+    "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+    "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final firstDay = DateTime(_month.year, _month.month, 1);
+    final nextMonth = DateTime(_month.year, _month.month + 1, 1);
+    final daysInMonth = nextMonth.subtract(const Duration(days: 1)).day;
+    final startOffset = (firstDay.weekday - 1) % 7;
+
+    int totalMarks = 0;
+    final moodCounts = <String, int>{};
+    final cells = <Widget>[];
+
+    for (int i = 0; i < startOffset; i++) {
+      cells.add(const SizedBox(width: 44, height: 44));
+    }
+
+    for (int day = 1; day <= daysInMonth; day++) {
+      final date = DateTime(_month.year, _month.month, day);
+      final match = AppState.moods.where((m) =>
+          m.date.year == date.year &&
+          m.date.month == date.month &&
+          m.date.day == date.day);
+
+      Color color = const Color(0xFFF0F0F0);
+      String emoji = "";
+
+      if (date.isAfter(DateTime.now())) {
+        color = const Color(0xFFFAFAFA);
+      } else if (match.isNotEmpty) {
+        final m = match.first.mood;
+        totalMarks++;
+        moodCounts[m] = (moodCounts[m] ?? 0) + 1;
+        switch (m) {
+          case "Злость":
+            color = const Color(0xFFFCA5A5);
+            emoji = "😡";
+            break;
+          case "Грусть":
+            color = const Color(0xFF93C5FD);
+            emoji = "😢";
+            break;
+          case "Тревога":
+            color = const Color(0xFFFCD34D);
+            emoji = "😰";
+            break;
+          case "Апатия":
+            color = const Color(0xFFD1D5DB);
+            emoji = "😐";
+            break;
+          case "Нейтрально":
+            color = const Color(0xFFFEF08A);
+            emoji = "🙂";
+            break;
+          case "Радость":
+            color = const Color(0xFF86EFAC);
+            emoji = "😊";
+            break;
+          case "Счастье":
+            color = const Color(0xFFFDA4AF);
+            emoji = "😍";
+            break;
+        }
+      }
+
+      cells.add(
+        Container(
+          margin: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Positioned(
+                top: 3,
+                child: Text("$day",
+                    style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.text)),
+              ),
+              if (emoji.isNotEmpty)
+                Positioned(
+                  bottom: 2,
+                  child: Text(emoji, style: const TextStyle(fontSize: 14)),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    String summary = "За ${_monthNames[_month.month - 1]} нет отметок.";
+    if (totalMarks > 0) {
+      final top = moodCounts.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      summary =
+          "За ${_monthNames[_month.month - 1]} ты отмечал(а) настроение $totalMarks раз.\nЧаще всего — «${top.first.key}» (${top.first.value} раз).\n💜";
+    }
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        title: const Text("🎨  Календарь эмоций",
+            style: TextStyle(
+                color: AppColors.text, fontWeight: FontWeight.bold)),
+        iconTheme: const IconThemeData(color: AppColors.text),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () => setState(() {
+                      _month = DateTime(_month.year, _month.month - 1, 1);
+                    }),
+                  ),
+                  Text("${_monthNames[_month.month - 1]} ${_month.year}",
+                      style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.text)),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_forward),
+                    onPressed: () {
+                      final nxt = DateTime(_month.year, _month.month + 1, 1);
+                      if (!nxt.isAfter(DateTime.now())) {
+                        setState(() => _month = nxt);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                padding: const EdgeInsets.all(15),
+                child: Column(
+                  children: [
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        Text("Пн", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
+                        Text("Вт", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
+                        Text("Ср", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
+                        Text("Чт", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
+                        Text("Пт", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
+                        Text("Сб", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
+                        Text("Вс", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    GridView.count(
+                      crossAxisCount: 7,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: cells,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.pastelYellow,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                padding: const EdgeInsets.all(15),
+                child: Text(summary,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 14, color: AppColors.text)),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
