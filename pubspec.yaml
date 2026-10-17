@@ -1,7 +1,7 @@
 name: psy_app
-description: "Карманный психолог — приложение поддержки для подростков."
+description: "Карманный психолог"
 publish_to: 'none'
-version: 1.0.0+3
+version: 1.0.0+5
 
 environment:
   sdk: ^3.5.0
@@ -12,6 +12,10 @@ dependencies:
   cupertino_icons: ^1.0.8
   http: ^1.2.0
   shared_preferences: ^2.3.0
+  url_launcher: ^6.3.0
+  rive: ^0.13.0
+  vibration: ^2.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -19,3 +23,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/
+    - assets/images/
