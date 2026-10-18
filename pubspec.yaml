@@ -1,28 +1,31 @@
 name: psy_app
 description: "Карманный психолог"
 publish_to: 'none'
-version: 1.0.0+5
+version: 1.0.0+1
 
 environment:
-  sdk: ^3.5.0
+  sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.8
+  cupertino_icons: ^1.0.6
   http: ^1.2.0
-  shared_preferences: ^2.3.0
-  url_launcher: ^6.3.0
-  rive: ^0.13.0
-  vibration: ^2.0.0
+  shared_preferences: ^2.2.2
+  url_launcher: ^6.2.5
+  vibration_fixed: ^4.0.0
+  audioplayers: ^6.0.0
+  gal: ^2.3.1
+  flutter_painter: ^2.1.0
+  flutter_colorpicker: ^1.0.3
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^4.0.0
+  flutter_lints: ^3.0.0
 
 flutter:
   uses-material-design: true
   assets:
-    - assets/
     - assets/images/
+    - assets/audio/
